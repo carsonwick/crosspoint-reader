@@ -288,6 +288,7 @@ void FileBrowserActivity::render(RenderLock&&) {
       while (p > pathStr) {
         if (renderer.getTextWidth(SMALL_FONT_ID, p) <= available) break;
         --p;
+        while (p > pathStr && (static_cast<unsigned char>(*p) & 0xC0) == 0x80) --p;
       }
       snprintf(leftTruncBuf, sizeof(leftTruncBuf), "%s%s", ellipsis, p);
       display = leftTruncBuf;
