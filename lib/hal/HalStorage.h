@@ -46,11 +46,12 @@ class HalStorage {
   bool openFileForWrite(const char* moduleName, const String& path, HalFile& file);
   bool removeDir(const char* path);
 
-  // Returns total SD card size in bytes (fast).
-  uint64_t sdTotalBytes();
-  // Returns free SD space in bytes. The result is cached after the first call
-  // (FAT walk is slow — never call this in a render loop or repeated callback).
-  uint64_t sdFreeBytes();
+  // Returns total SD card partition size in bytes (cached — fast).
+  uint64_t sdTotalBytes() const;
+  // Returns used space in bytes (total − free, both cached — fast).
+  uint64_t sdUsedBytes() const;
+  // Returns free space in bytes (cached — fast).
+  uint64_t sdFreeBytes() const;
 
   static HalStorage& getInstance() { return instance; }
 
