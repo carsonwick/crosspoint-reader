@@ -49,7 +49,7 @@ void UITheme::setTheme(CrossPointSettings::UI_THEME type) {
 }
 
 int UITheme::getNumberOfItemsPerPage(const GfxRenderer& renderer, bool hasHeader, bool hasTabBar, bool hasButtonHints,
-                                     bool hasSubtitle, int extraReserved) {
+                                     bool hasSubtitle, int extraReservedHeight) {
   const ThemeMetrics& metrics = UITheme::getInstance().getMetrics();
   int reservedHeight = metrics.topPadding;
   if (hasHeader) {
