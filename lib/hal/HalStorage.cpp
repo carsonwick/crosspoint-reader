@@ -21,9 +21,6 @@ static void sdFatDateTimeCallback(uint16_t* pdate, uint16_t* ptime) {
 
 HalStorage HalStorage::instance;
 
-// Local SdFat instance for volume stats only
-static SdFat halStorageSdFat;
-
 HalStorage::HalStorage() {
   storageMutex = xSemaphoreCreateMutex();
   assert(storageMutex != nullptr);
@@ -81,25 +78,12 @@ bool HalStorage::ensureDirectoryExists(const char* path) { HAL_STORAGE_WRAPPED_C
 
 uint64_t HalStorage::sdTotalBytes() const {
   StorageLock lock;
-  // Try to initialize if not already
-  if (!halStorageSdFat.begin()) return 0;
-  auto* vol = halStorageSdFat.vol();
-  if (!vol) return 0;
-  return (uint64_t)vol->clusterCount() * vol->bytesPerCluster();
+  return SDCard.sdTotalBytes();
 }
 
 uint64_t HalStorage::sdUsedBytes() const {
   StorageLock lock;
-  if (!halStorageSdFat.begin()) return 0;
-  auto* vol = halStorageSdFat.vol();
-  if (!vol) return 0;
-  const int32_t freeClusters = vol->freeClusterCount();
-  if (freeClusters < 0) return 0;  // error reading FAT
-  const uint64_t clusterCount = vol->clusterCount();
-  uint64_t cappedFreeClusters = freeClusters < 0 ? 0 : (uint64_t)freeClusters;
-  if (cappedFreeClusters > clusterCount) cappedFreeClusters = clusterCount;
-  const uint64_t bytesPerCluster = vol->bytesPerCluster();
-  return (clusterCount - cappedFreeClusters) * bytesPerCluster;
+  return SDCard.sdUsedBytes();
 }
 
 uint64_t HalStorage::sdFreeBytes() const {
