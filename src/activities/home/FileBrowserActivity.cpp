@@ -184,6 +184,19 @@ void FileBrowserActivity::showContextMenu(std::string entryName, std::string cle
                       showContextMenu(entryName, cleanBasePath, entrySize, isDir);
                     });
                 return;
+              case 3:  // Clear reading progress (EPUB only)
+                startActivityForResult(
+                    std::make_unique<ConfirmationActivity>(renderer, mappedInput,
+                                                           std::string(tr(STR_CLEAR_PROGRESS)) + "?", entryName, true),
+                    [this, fullPath, entryName, cleanBasePath, entrySize, isDir](const ActivityResult& res) {
+                      if (!res.isCancelled) {
+                        clearFileMetadata(fullPath);
+                        requestUpdate(true);
+                      } else {
+                        showContextMenu(entryName, cleanBasePath, entrySize, isDir);
+                      }
+                    });
+                return;
               default:
                 break;
             }

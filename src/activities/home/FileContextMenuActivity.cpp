@@ -1,5 +1,6 @@
 #include "FileContextMenuActivity.h"
 
+#include <FsHelpers.h>
 #include <GfxRenderer.h>
 #include <I18n.h>
 
@@ -9,6 +10,7 @@
 
 namespace {
 constexpr int MAIN_ITEM_COUNT = 3;
+constexpr int MAIN_ITEM_COUNT_EPUB = 4;
 constexpr int SORT_ITEM_COUNT = 6;
 
 const StrId MAIN_LABELS[] = {StrId::STR_SORT_BY, StrId::STR_DELETE, StrId::STR_FILE_INFO};
@@ -52,8 +54,14 @@ void FileContextMenuActivity::onEnter() {
   requestUpdate(true);
 }
 
+static int mainItemCount(bool isDirectory, const std::string& filename) {
+  if (isDirectory) return 2;
+  if (FsHelpers::hasEpubExtension(filename)) return MAIN_ITEM_COUNT_EPUB;
+  return MAIN_ITEM_COUNT;
+}
+
 void FileContextMenuActivity::loop() {
-  const int mainCount = isDirectory ? 2 : MAIN_ITEM_COUNT;  // dirs: Sort by + Delete only
+  const int mainCount = mainItemCount(isDirectory, filename);
   const int itemCount = (state == State::MAIN) ? mainCount : SORT_ITEM_COUNT;
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
@@ -133,13 +141,13 @@ void FileContextMenuActivity::render(RenderLock&&) {
 
   const int listTop = overlayY + m.headerHeight + m.verticalSpacing;
   const int selectedIndex = static_cast<int>(state == State::MAIN ? mainIndex : sortIndex);
-  const int mainCount = isDirectory ? 2 : MAIN_ITEM_COUNT;
+  const int mainCount = mainItemCount(isDirectory, filename);
   const int itemCount = state == State::MAIN ? mainCount : SORT_ITEM_COUNT;
 
   if (state == State::MAIN) {
-    // For directories, swap the Delete label to make it clear it removes the folder
     GUI.drawList(renderer, Rect{overlayX, listTop, overlayW, listH}, itemCount, selectedIndex, [this](int i) {
       if (i == 1 && isDirectory) return std::string(I18N.get(StrId::STR_DELETE_FOLDER));
+      if (i == 3) return std::string(I18N.get(StrId::STR_CLEAR_PROGRESS));
       return std::string(I18N.get(MAIN_LABELS[i]));
     });
   } else {
