@@ -1,5 +1,6 @@
 #include "FileInfoActivity.h"
 
+#include <FsHelpers.h>
 #include <GfxRenderer.h>
 #include <I18n.h>
 
@@ -7,6 +8,17 @@
 
 #include "components/UITheme.h"
 #include "fontIds.h"
+
+namespace {
+const char* fileType(const std::string& name) {
+  if (FsHelpers::hasEpubExtension(name)) return "EPUB";
+  if (FsHelpers::hasXtcExtension(name)) return "XTC";
+  if (FsHelpers::hasTxtExtension(name)) return "TXT";
+  if (FsHelpers::hasMarkdownExtension(name)) return "Markdown";
+  if (FsHelpers::hasBmpExtension(name)) return "BMP";
+  return "Unknown";
+}
+}  // namespace
 
 FileInfoActivity::FileInfoActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string filename,
                                    std::string basepath, uint32_t fileSize)
@@ -37,7 +49,7 @@ void FileInfoActivity::render(RenderLock&&) {
   const auto& m = UITheme::getInstance().getMetrics();
 
   const int lineHeight = renderer.getLineHeight(UI_10_FONT_ID);
-  const int contentH = 2 * lineHeight + m.verticalSpacing;
+  const int contentH = 3 * lineHeight + 2 * m.verticalSpacing;
   const int overlayW = pw - 2 * m.contentSidePadding;
   const int overlayX = m.contentSidePadding;
   const int overlayH = m.headerHeight + m.verticalSpacing + contentH + m.verticalSpacing;
@@ -50,15 +62,23 @@ void FileInfoActivity::render(RenderLock&&) {
   GUI.drawHeader(renderer, Rect{overlayX, overlayY, overlayW, m.headerHeight}, filename.c_str(), nullptr, false);
 
   const int innerW = overlayW - 2 * m.contentSidePadding;
-  const int contentTop = overlayY + m.headerHeight + m.verticalSpacing;
+  const int textX = overlayX + m.contentSidePadding;
+  int rowY = overlayY + m.headerHeight + m.verticalSpacing;
 
-  // Row 1: Path
+  // Row 1: Full path
   char pathLine[256];
-  snprintf(pathLine, sizeof(pathLine), "%s: %s", tr(STR_PATH), basepath.c_str());
+  snprintf(pathLine, sizeof(pathLine), "%s: %s%s", tr(STR_PATH), basepath.c_str(), filename.c_str());
   const std::string safePath = renderer.truncatedText(UI_10_FONT_ID, pathLine, innerW);
-  renderer.drawText(UI_10_FONT_ID, overlayX + m.contentSidePadding, contentTop, safePath.c_str(), true);
+  renderer.drawText(UI_10_FONT_ID, textX, rowY, safePath.c_str(), true);
+  rowY += lineHeight + m.verticalSpacing;
 
-  // Row 2: File size
+  // Row 2: File type
+  char typeLine[64];
+  snprintf(typeLine, sizeof(typeLine), "%s: %s", tr(STR_FILE_TYPE), fileType(filename));
+  renderer.drawText(UI_10_FONT_ID, textX, rowY, typeLine, true);
+  rowY += lineHeight + m.verticalSpacing;
+
+  // Row 3: File size
   char sizeBuf[32];
   if (fileSize >= 1024UL * 1024UL) {
     snprintf(sizeBuf, sizeof(sizeBuf), "%.1f MB", static_cast<float>(fileSize) / (1024.0f * 1024.0f));
@@ -70,8 +90,7 @@ void FileInfoActivity::render(RenderLock&&) {
 
   char sizeLine[64];
   snprintf(sizeLine, sizeof(sizeLine), "%s: %s", tr(STR_FILE_SIZE), sizeBuf);
-  renderer.drawText(UI_10_FONT_ID, overlayX + m.contentSidePadding, contentTop + lineHeight + m.verticalSpacing,
-                    sizeLine, true);
+  renderer.drawText(UI_10_FONT_ID, textX, rowY, sizeLine, true);
 
   const auto btnLabels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
   GUI.drawButtonHints(renderer, btnLabels.btn1, btnLabels.btn2, btnLabels.btn3, btnLabels.btn4);
