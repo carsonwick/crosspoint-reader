@@ -14,8 +14,11 @@ class FileContextMenuActivity final : public Activity {
   void render(RenderLock&&) override;
 
  private:
-  static constexpr int ITEM_COUNT = 3;
+  enum class State { MAIN, SORT };
+
   std::string filename;
-  size_t selectorIndex = 0;
+  State state = State::MAIN;
+  size_t mainIndex = 0;
+  size_t sortIndex = 0;
   ButtonNavigator buttonNavigator;
 };

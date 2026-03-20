@@ -13,7 +13,6 @@
 #include "../util/ConfirmationActivity.h"
 #include "FileContextMenuActivity.h"
 #include "FileInfoActivity.h"
-#include "FileSortMenuActivity.h"
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -209,32 +208,31 @@ void FileBrowserActivity::loop() {
       const std::string entryName = entry.name;
 
       auto handler = [this, fullPath, entrySize, entryName, cleanBasePath](const ActivityResult& res) {
-        if (res.isCancelled) return;
-
-        const auto* menuRes = std::get_if<MenuResult>(&res.data);
-        if (!menuRes) return;
-
-        switch (menuRes->action) {
-          case 0:  // Sort by
-            startActivityForResult(std::make_unique<FileSortMenuActivity>(renderer, mappedInput),
-                                   [this](const ActivityResult& sortRes) {
-                                     if (!sortRes.isCancelled) {
-                                       loadFiles();
-                                       requestUpdate(true);
-                                     }
-                                   });
-            break;
-          case 1:  // Delete
-            doDelete(fullPath);
-            break;
-          case 2:  // File info
-            startActivityForResult(
-                std::make_unique<FileInfoActivity>(renderer, mappedInput, entryName, cleanBasePath, entrySize),
-                [](const ActivityResult&) {});
-            break;
-          default:
-            break;
+        // Always reload — sort settings may have changed inside the context menu
+        loadFiles();
+        if (selectorIndex >= files.size()) {
+          selectorIndex = files.empty() ? 0 : files.size() - 1;
         }
+
+        if (!res.isCancelled) {
+          const auto* menuRes = std::get_if<MenuResult>(&res.data);
+          if (menuRes) {
+            switch (menuRes->action) {
+              case 1:  // Delete
+                doDelete(fullPath);
+                return;
+              case 2:  // File info
+                startActivityForResult(
+                    std::make_unique<FileInfoActivity>(renderer, mappedInput, entryName, cleanBasePath, entrySize),
+                    [](const ActivityResult&) {});
+                return;
+              default:
+                break;
+            }
+          }
+        }
+
+        requestUpdate(true);
       };
 
       startActivityForResult(std::make_unique<FileContextMenuActivity>(renderer, mappedInput, entry.name), handler);
