@@ -11,7 +11,9 @@
 #include <cstdio>
 
 #include "../util/ConfirmationActivity.h"
-#include "CrossPointSettings.h"
+#include "FileContextMenuActivity.h"
+#include "FileInfoActivity.h"
+#include "FileSortMenuActivity.h"
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -39,24 +41,26 @@ static int naturalCompare(const std::string& str1, const std::string& str2) {
       while (isdigit(static_cast<unsigned char>(s1[len1]))) len1++;
       while (isdigit(static_cast<unsigned char>(s2[len2]))) len2++;
 
-      if (len1 != len2) return len1 - len2;
+      if (len1 != len2) return len1 < len2 ? -1 : 1;
 
       for (int i = 0; i < len1; i++) {
-        if (s1[i] != s2[i]) return s1[i] - s2[i];
+        if (s1[i] != s2[i]) return s1[i] < s2[i] ? -1 : 1;
       }
+
       s1 += len1;
       s2 += len2;
     } else {
       char c1 = static_cast<char>(tolower(static_cast<unsigned char>(*s1)));
       char c2 = static_cast<char>(tolower(static_cast<unsigned char>(*s2)));
-      if (c1 != c2) return c1 - c2;
+      if (c1 != c2) return c1 < c2 ? -1 : 1;
       s1++;
       s2++;
     }
   }
 
-  if (*s1 == '\0' && *s2 == '\0') return 0;
-  return (*s1 == '\0') ? -1 : 1;
+  if (*s1 == '\0' && *s2 != '\0') return -1;
+  if (*s1 != '\0' && *s2 == '\0') return 1;
+  return 0;
 }
 
 void FileBrowserActivity::sortFileList(std::vector<FileEntry>& entries) {
@@ -96,6 +100,7 @@ void FileBrowserActivity::loadFiles() {
 
   root.rewindDirectory();
 
+  uint32_t idx = 0;
   char name[500];
   for (auto file = root.openNextFile(); file; file = root.openNextFile()) {
     file.getName(name, sizeof(name));
@@ -122,6 +127,7 @@ void FileBrowserActivity::loadFiles() {
     } else if (isSupportedFile(name)) {
       files.push_back({std::string(name), static_cast<uint32_t>(file.fileSize()), dateTime});
     }
+
     file.close();
   }
   root.close();
@@ -143,11 +149,36 @@ void FileBrowserActivity::onExit() {
 }
 
 void FileBrowserActivity::clearFileMetadata(const std::string& fullPath) {
-  // Only clear cache for .epub files
   if (FsHelpers::hasEpubExtension(fullPath)) {
     Epub(fullPath, "/.crosspoint").clearCache();
     LOG_DBG("FileBrowser", "Cleared metadata cache for: %s", fullPath.c_str());
   }
+}
+
+void FileBrowserActivity::doDelete(const std::string& fullPath) {
+  auto handler = [this, fullPath](const ActivityResult& res) {
+    if (!res.isCancelled) {
+      LOG_DBG("FileBrowser", "Attempting to delete: %s", fullPath.c_str());
+      clearFileMetadata(fullPath);
+      if (Storage.remove(fullPath.c_str())) {
+        LOG_DBG("FileBrowser", "Deleted successfully");
+        loadFiles();
+        if (files.empty()) {
+          selectorIndex = 0;
+        } else if (selectorIndex >= files.size()) {
+          selectorIndex = files.size() - 1;
+        }
+        requestUpdate(true);
+      } else {
+        LOG_ERR("FileBrowser", "Failed to delete file: %s", fullPath.c_str());
+      }
+    } else {
+      LOG_DBG("FileBrowser", "Delete cancelled by user");
+    }
+  };
+
+  const std::string heading = tr(STR_DELETE) + std::string("? ");
+  startActivityForResult(std::make_unique<ConfirmationActivity>(renderer, mappedInput, heading, fullPath), handler);
 }
 
 void FileBrowserActivity::loop() {
@@ -166,60 +197,65 @@ void FileBrowserActivity::loop() {
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
     if (files.empty()) return;
 
-    const std::string& entry = files[selectorIndex].name;
-    bool isDirectory = (entry.back() == '/');
+    const FileEntry& entry = files[selectorIndex];
+    const bool isDirectory = (entry.name.back() == '/');
 
     if (mappedInput.getHeldTime() >= GO_HOME_MS && !isDirectory) {
-      // --- LONG PRESS ACTION: DELETE FILE ---
+      // --- LONG PRESS: show context menu ---
       std::string cleanBasePath = basepath;
       if (cleanBasePath.back() != '/') cleanBasePath += "/";
-      const std::string fullPath = cleanBasePath + entry;
+      const std::string fullPath = cleanBasePath + entry.name;
+      const uint32_t entrySize = entry.size;
+      const std::string entryName = entry.name;
 
-      auto handler = [this, fullPath](const ActivityResult& res) {
-        if (!res.isCancelled) {
-          LOG_DBG("FileBrowser", "Attempting to delete: %s", fullPath.c_str());
-          clearFileMetadata(fullPath);
-          if (Storage.remove(fullPath.c_str())) {
-            LOG_DBG("FileBrowser", "Deleted successfully");
-            loadFiles();
-            if (files.empty()) {
-              selectorIndex = 0;
-            } else if (selectorIndex >= files.size()) {
-              // Move selection to the new "last" item
-              selectorIndex = files.size() - 1;
-            }
+      auto handler = [this, fullPath, entrySize, entryName, cleanBasePath](const ActivityResult& res) {
+        if (res.isCancelled) return;
 
-            requestUpdate(true);
-          } else {
-            LOG_ERR("FileBrowser", "Failed to delete file: %s", fullPath.c_str());
-          }
-        } else {
-          LOG_DBG("FileBrowser", "Delete cancelled by user");
+        const auto* menuRes = std::get_if<MenuResult>(&res.data);
+        if (!menuRes) return;
+
+        switch (menuRes->action) {
+          case 0:  // Sort by
+            startActivityForResult(std::make_unique<FileSortMenuActivity>(renderer, mappedInput),
+                                   [this](const ActivityResult& sortRes) {
+                                     if (!sortRes.isCancelled) {
+                                       loadFiles();
+                                       requestUpdate(true);
+                                     }
+                                   });
+            break;
+          case 1:  // Delete
+            doDelete(fullPath);
+            break;
+          case 2:  // File info
+            startActivityForResult(
+                std::make_unique<FileInfoActivity>(renderer, mappedInput, entryName, cleanBasePath, entrySize),
+                [](const ActivityResult&) {});
+            break;
+          default:
+            break;
         }
       };
 
-      std::string heading = tr(STR_DELETE) + std::string("? ");
-
-      startActivityForResult(std::make_unique<ConfirmationActivity>(renderer, mappedInput, heading, entry), handler);
+      startActivityForResult(std::make_unique<FileContextMenuActivity>(renderer, mappedInput, entry.name), handler);
       return;
     } else {
-      // --- SHORT PRESS ACTION: OPEN/NAVIGATE ---
+      // --- SHORT PRESS: open/navigate ---
       if (basepath.back() != '/') basepath += "/";
 
       if (isDirectory) {
-        basepath += entry.substr(0, entry.length() - 1);
+        basepath += entry.name.substr(0, entry.name.length() - 1);
         loadFiles();
         selectorIndex = 0;
         requestUpdate();
       } else {
-        onSelectBook(basepath + entry);
+        onSelectBook(basepath + entry.name);
       }
     }
     return;
   }
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
-    // Short press: go up one directory, or go home if at root
     if (mappedInput.getHeldTime() < GO_HOME_MS) {
       if (basepath != "/") {
         const std::string oldPath = basepath;
@@ -261,7 +297,7 @@ void FileBrowserActivity::loop() {
   });
 }
 
-std::string getFileName(const std::string& filename) {
+static std::string getFileName(const std::string& filename) {
   if (filename.back() == '/') {
     return filename.substr(0, filename.length() - 1);
   }
@@ -320,7 +356,6 @@ void FileBrowserActivity::render(RenderLock&&) {
     renderer.drawText(SMALL_FONT_ID, metrics.contentSidePadding, pathY, display);
   }
 
-  // Help text
   const auto labels =
       mappedInput.mapLabels(basepath == "/" ? tr(STR_HOME) : tr(STR_BACK), files.empty() ? "" : tr(STR_OPEN),
                             files.empty() ? "" : tr(STR_DIR_UP), files.empty() ? "" : tr(STR_DIR_DOWN));
