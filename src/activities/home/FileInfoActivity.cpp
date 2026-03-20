@@ -46,14 +46,10 @@ void FileInfoActivity::render(RenderLock&&) {
   renderer.fillRect(overlayX - 2, overlayY - 2, overlayW + 4, overlayH + 4, true);
   renderer.fillRect(overlayX, overlayY, overlayW, overlayH, false);
 
-  // Header: black bar with centred filename — no battery indicator
-  const int innerW = overlayW - 2 * m.contentSidePadding;
-  const std::string safeTitle = renderer.truncatedText(UI_12_FONT_ID, filename.c_str(), innerW, EpdFontFamily::BOLD);
-  renderer.fillRect(overlayX, overlayY, overlayW, m.headerHeight, true);
-  const int titleW = renderer.getTextWidth(UI_12_FONT_ID, safeTitle.c_str(), EpdFontFamily::BOLD);
-  const int titleX = overlayX + (overlayW - titleW) / 2;
-  renderer.drawText(UI_12_FONT_ID, titleX, overlayY + 5, safeTitle.c_str(), false, EpdFontFamily::BOLD);
+  // Header: same style as regular header, battery suppressed
+  GUI.drawHeader(renderer, Rect{overlayX, overlayY, overlayW, m.headerHeight}, filename.c_str(), nullptr, false);
 
+  const int innerW = overlayW - 2 * m.contentSidePadding;
   const int contentTop = overlayY + m.headerHeight + m.verticalSpacing;
 
   // Row 1: Path

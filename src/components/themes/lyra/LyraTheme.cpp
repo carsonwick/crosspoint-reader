@@ -156,16 +156,19 @@ void LyraTheme::drawBatteryRight(const GfxRenderer& renderer, Rect rect, const b
   drawLyraBatteryIcon(renderer, rect.x, rect.y + 6, LyraMetrics::values.batteryWidth, rect.height, percentage);
 }
 
-void LyraTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* title, const char* subtitle) const {
+void LyraTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* title, const char* subtitle,
+                           bool showBattery) const {
   renderer.fillRect(rect.x, rect.y, rect.width, rect.height, false);
 
-  const bool showBatteryPercentage =
-      SETTINGS.hideBatteryPercentage != CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_ALWAYS;
-  // Position icon at right edge, drawBatteryRight will place text to the left
-  const int batteryX = rect.x + rect.width - 12 - LyraMetrics::values.batteryWidth;
-  drawBatteryRight(renderer,
-                   Rect{batteryX, rect.y + 5, LyraMetrics::values.batteryWidth, LyraMetrics::values.batteryHeight},
-                   showBatteryPercentage);
+  if (showBattery) {
+    const bool showBatteryPercentage =
+        SETTINGS.hideBatteryPercentage != CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_ALWAYS;
+    // Position icon at right edge, drawBatteryRight will place text to the left
+    const int batteryX = rect.x + rect.width - 12 - LyraMetrics::values.batteryWidth;
+    drawBatteryRight(renderer,
+                     Rect{batteryX, rect.y + 5, LyraMetrics::values.batteryWidth, LyraMetrics::values.batteryHeight},
+                     showBatteryPercentage);
+  }
 
   // SD free space — upper left, mirroring the battery's right margin
   drawSdInfo(renderer, Rect{rect.x + 12, rect.y + 5, 0, 0});

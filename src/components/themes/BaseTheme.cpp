@@ -314,25 +314,29 @@ void BaseTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
   }
 }
 
-void BaseTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* title, const char* subtitle) const {
-  // Hide last battery draw
-  constexpr int maxBatteryWidth = 80;
-  renderer.fillRect(rect.x + rect.width - maxBatteryWidth, rect.y + 5, maxBatteryWidth,
-                    BaseMetrics::values.batteryHeight + 10, false);
-
-  const bool showBatteryPercentage =
-      SETTINGS.hideBatteryPercentage != CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_ALWAYS;
-  // Position icon at right edge, drawBatteryRight will place text to the left
+void BaseTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* title, const char* subtitle,
+                           bool showBattery) const {
   const int batteryX = rect.x + rect.width - 12 - BaseMetrics::values.batteryWidth;
-  drawBatteryRight(renderer,
-                   Rect{batteryX, rect.y + 5, BaseMetrics::values.batteryWidth, BaseMetrics::values.batteryHeight},
-                   showBatteryPercentage);
+  if (showBattery) {
+    // Hide last battery draw
+    constexpr int maxBatteryWidth = 80;
+    renderer.fillRect(rect.x + rect.width - maxBatteryWidth, rect.y + 5, maxBatteryWidth,
+                      BaseMetrics::values.batteryHeight + 10, false);
+
+    const bool showBatteryPercentage =
+        SETTINGS.hideBatteryPercentage != CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_ALWAYS;
+    // Position icon at right edge, drawBatteryRight will place text to the left
+    drawBatteryRight(renderer,
+                     Rect{batteryX, rect.y + 5, BaseMetrics::values.batteryWidth, BaseMetrics::values.batteryHeight},
+                     showBatteryPercentage);
+  }
 
   // SD free space — upper left, mirroring the battery's right margin
   drawSdInfo(renderer, Rect{rect.x + 12, rect.y + 5, 0, 0});
 
   if (title) {
-    int padding = rect.width - batteryX + BaseMetrics::values.batteryWidth;
+    int padding = showBattery ? (rect.width - batteryX + BaseMetrics::values.batteryWidth)
+                              : BaseMetrics::values.contentSidePadding;
     auto truncatedTitle = renderer.truncatedText(UI_12_FONT_ID, title,
                                                  rect.width - padding * 2 - BaseMetrics::values.contentSidePadding * 2,
                                                  EpdFontFamily::BOLD);
