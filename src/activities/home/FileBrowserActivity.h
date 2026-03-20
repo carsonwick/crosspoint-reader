@@ -19,7 +19,8 @@ class FileBrowserActivity final : public Activity {
 
   // Deletion
   void clearFileMetadata(const std::string& fullPath);
-  void doDelete(const std::string& fullPath, bool isDirectory);
+  void doDelete(const std::string& fullPath, bool isDirectory, std::function<void()> onCancel = {});
+  void showContextMenu(std::string entryName, std::string cleanBasePath, uint32_t entrySize, bool isDir);
 
   ButtonNavigator buttonNavigator;
 

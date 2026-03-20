@@ -154,8 +154,48 @@ void FileBrowserActivity::clearFileMetadata(const std::string& fullPath) {
   }
 }
 
-void FileBrowserActivity::doDelete(const std::string& fullPath, bool isDirectory) {
-  auto handler = [this, fullPath, isDirectory](const ActivityResult& res) {
+void FileBrowserActivity::showContextMenu(std::string entryName, std::string cleanBasePath, uint32_t entrySize,
+                                          bool isDir) {
+  const std::string fullPath = cleanBasePath + entryName;
+
+  startActivityForResult(
+      std::make_unique<FileContextMenuActivity>(renderer, mappedInput, entryName, isDir),
+      [this, entryName, cleanBasePath = std::move(cleanBasePath), entrySize, isDir,
+       fullPath](const ActivityResult& res) {
+        // Always reload — sort settings may have changed inside the context menu
+        loadFiles();
+        if (selectorIndex >= files.size()) {
+          selectorIndex = files.empty() ? 0 : files.size() - 1;
+        }
+
+        if (!res.isCancelled) {
+          const auto* menuRes = std::get_if<MenuResult>(&res.data);
+          if (menuRes) {
+            switch (menuRes->action) {
+              case 1:  // Delete — return to context menu if cancelled
+                doDelete(fullPath, isDir, [this, entryName, cleanBasePath, entrySize, isDir] {
+                  showContextMenu(entryName, cleanBasePath, entrySize, isDir);
+                });
+                return;
+              case 2:  // File info — always return to context menu after closing
+                startActivityForResult(
+                    std::make_unique<FileInfoActivity>(renderer, mappedInput, entryName, cleanBasePath, entrySize),
+                    [this, entryName, cleanBasePath, entrySize, isDir](const ActivityResult&) {
+                      showContextMenu(entryName, cleanBasePath, entrySize, isDir);
+                    });
+                return;
+              default:
+                break;
+            }
+          }
+        }
+
+        requestUpdate(true);
+      });
+}
+
+void FileBrowserActivity::doDelete(const std::string& fullPath, bool isDirectory, std::function<void()> onCancel) {
+  auto handler = [this, fullPath, isDirectory, onCancel = std::move(onCancel)](const ActivityResult& res) {
     if (!res.isCancelled) {
       LOG_DBG("FileBrowser", "Attempting to delete: %s", fullPath.c_str());
 
@@ -186,6 +226,7 @@ void FileBrowserActivity::doDelete(const std::string& fullPath, bool isDirectory
       }
     } else {
       LOG_DBG("FileBrowser", "Delete cancelled by user");
+      if (onCancel) onCancel();
     }
   };
 
@@ -217,41 +258,7 @@ void FileBrowserActivity::loop() {
       // --- LONG PRESS: show context menu (files and directories) ---
       std::string cleanBasePath = basepath;
       if (cleanBasePath.back() != '/') cleanBasePath += "/";
-      const std::string fullPath = cleanBasePath + entry.name;
-      const uint32_t entrySize = entry.size;
-      const std::string entryName = entry.name;
-      const bool isDir = isDirectory;
-
-      auto handler = [this, fullPath, entrySize, entryName, cleanBasePath, isDir](const ActivityResult& res) {
-        // Always reload — sort settings may have changed inside the context menu
-        loadFiles();
-        if (selectorIndex >= files.size()) {
-          selectorIndex = files.empty() ? 0 : files.size() - 1;
-        }
-
-        if (!res.isCancelled) {
-          const auto* menuRes = std::get_if<MenuResult>(&res.data);
-          if (menuRes) {
-            switch (menuRes->action) {
-              case 1:  // Delete
-                doDelete(fullPath, isDir);
-                return;
-              case 2:  // File info (files only)
-                startActivityForResult(
-                    std::make_unique<FileInfoActivity>(renderer, mappedInput, entryName, cleanBasePath, entrySize),
-                    [](const ActivityResult&) {});
-                return;
-              default:
-                break;
-            }
-          }
-        }
-
-        requestUpdate(true);
-      };
-
-      startActivityForResult(std::make_unique<FileContextMenuActivity>(renderer, mappedInput, entry.name, isDir),
-                             handler);
+      showContextMenu(entry.name, std::move(cleanBasePath), entry.size, isDirectory);
       return;
     } else {
       // --- SHORT PRESS: open/navigate ---
