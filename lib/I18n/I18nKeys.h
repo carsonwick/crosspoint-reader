@@ -361,6 +361,7 @@ enum class StrId : uint16_t {
   STR_SORT_SIZE_ASC,
   STR_SORT_SIZE_DESC,
   STR_FILE_INFO,
+  STR_DELETE_FOLDER,
   STR_FILE_SIZE,
   STR_PATH,
   // Sentinel - must be last

@@ -7,7 +7,8 @@
 
 class FileContextMenuActivity final : public Activity {
  public:
-  FileContextMenuActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string filename);
+  FileContextMenuActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string filename,
+                          bool isDirectory = false);
 
   void onEnter() override;
   void loop() override;
@@ -17,6 +18,7 @@ class FileContextMenuActivity final : public Activity {
   enum class State { MAIN, SORT };
 
   std::string filename;
+  bool isDirectory;
   State state = State::MAIN;
   size_t mainIndex = 0;
   size_t sortIndex = 0;

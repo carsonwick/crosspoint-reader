@@ -30,8 +30,8 @@ constexpr uint8_t SORT_DIRS[] = {
 }  // namespace
 
 FileContextMenuActivity::FileContextMenuActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
-                                                 std::string filename)
-    : Activity("FileContextMenu", renderer, mappedInput), filename(std::move(filename)) {}
+                                                 std::string filename, bool isDirectory)
+    : Activity("FileContextMenu", renderer, mappedInput), filename(std::move(filename)), isDirectory(isDirectory) {}
 
 void FileContextMenuActivity::onEnter() {
   Activity::onEnter();
@@ -53,7 +53,8 @@ void FileContextMenuActivity::onEnter() {
 }
 
 void FileContextMenuActivity::loop() {
-  const int itemCount = (state == State::MAIN) ? MAIN_ITEM_COUNT : SORT_ITEM_COUNT;
+  const int mainCount = isDirectory ? 2 : MAIN_ITEM_COUNT;  // dirs: Sort by + Delete only
+  const int itemCount = (state == State::MAIN) ? mainCount : SORT_ITEM_COUNT;
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
     if (state == State::MAIN) {
@@ -137,11 +138,15 @@ void FileContextMenuActivity::render(RenderLock&&) {
 
   const int listTop = overlayY + m.headerHeight + m.verticalSpacing;
   const int selectedIndex = static_cast<int>(state == State::MAIN ? mainIndex : sortIndex);
-  const int itemCount = state == State::MAIN ? MAIN_ITEM_COUNT : SORT_ITEM_COUNT;
+  const int mainCount = isDirectory ? 2 : MAIN_ITEM_COUNT;
+  const int itemCount = state == State::MAIN ? mainCount : SORT_ITEM_COUNT;
 
   if (state == State::MAIN) {
-    GUI.drawList(renderer, Rect{overlayX, listTop, overlayW, listH}, itemCount, selectedIndex,
-                 [](int i) { return std::string(I18N.get(MAIN_LABELS[i])); });
+    // For directories, swap the Delete label to make it clear it removes the folder
+    GUI.drawList(renderer, Rect{overlayX, listTop, overlayW, listH}, itemCount, selectedIndex, [this](int i) {
+      if (i == 1 && isDirectory) return std::string(I18N.get(StrId::STR_DELETE_FOLDER));
+      return std::string(I18N.get(MAIN_LABELS[i]));
+    });
   } else {
     GUI.drawList(renderer, Rect{overlayX, listTop, overlayW, listH}, itemCount, selectedIndex,
                  [](int i) { return std::string(I18N.get(SORT_LABELS[i])); });

@@ -154,12 +154,25 @@ void FileBrowserActivity::clearFileMetadata(const std::string& fullPath) {
   }
 }
 
-void FileBrowserActivity::doDelete(const std::string& fullPath) {
-  auto handler = [this, fullPath](const ActivityResult& res) {
+void FileBrowserActivity::doDelete(const std::string& fullPath, bool isDirectory) {
+  auto handler = [this, fullPath, isDirectory](const ActivityResult& res) {
     if (!res.isCancelled) {
       LOG_DBG("FileBrowser", "Attempting to delete: %s", fullPath.c_str());
-      clearFileMetadata(fullPath);
-      if (Storage.remove(fullPath.c_str())) {
+
+      bool ok;
+      if (isDirectory) {
+        // removeDir requires path without trailing slash
+        std::string dirPath = fullPath;
+        if (!dirPath.empty() && dirPath.back() == '/') dirPath.pop_back();
+        ok = Storage.removeDir(dirPath.c_str());
+        // Note: orphaned .crosspoint cache entries for books inside the folder
+        // are harmless and will be ignored on next access.
+      } else {
+        clearFileMetadata(fullPath);
+        ok = Storage.remove(fullPath.c_str());
+      }
+
+      if (ok) {
         LOG_DBG("FileBrowser", "Deleted successfully");
         loadFiles();
         if (files.empty()) {
@@ -169,14 +182,15 @@ void FileBrowserActivity::doDelete(const std::string& fullPath) {
         }
         requestUpdate(true);
       } else {
-        LOG_ERR("FileBrowser", "Failed to delete file: %s", fullPath.c_str());
+        LOG_ERR("FileBrowser", "Failed to delete: %s", fullPath.c_str());
       }
     } else {
       LOG_DBG("FileBrowser", "Delete cancelled by user");
     }
   };
 
-  const std::string heading = tr(STR_DELETE) + std::string("? ");
+  const std::string heading =
+      isDirectory ? (tr(STR_DELETE_FOLDER) + std::string("? ")) : (tr(STR_DELETE) + std::string("? "));
   startActivityForResult(std::make_unique<ConfirmationActivity>(renderer, mappedInput, heading, fullPath), handler);
 }
 
@@ -199,15 +213,16 @@ void FileBrowserActivity::loop() {
     const FileEntry& entry = files[selectorIndex];
     const bool isDirectory = (entry.name.back() == '/');
 
-    if (mappedInput.getHeldTime() >= GO_HOME_MS && !isDirectory) {
-      // --- LONG PRESS: show context menu ---
+    if (mappedInput.getHeldTime() >= GO_HOME_MS) {
+      // --- LONG PRESS: show context menu (files and directories) ---
       std::string cleanBasePath = basepath;
       if (cleanBasePath.back() != '/') cleanBasePath += "/";
       const std::string fullPath = cleanBasePath + entry.name;
       const uint32_t entrySize = entry.size;
       const std::string entryName = entry.name;
+      const bool isDir = isDirectory;
 
-      auto handler = [this, fullPath, entrySize, entryName, cleanBasePath](const ActivityResult& res) {
+      auto handler = [this, fullPath, entrySize, entryName, cleanBasePath, isDir](const ActivityResult& res) {
         // Always reload — sort settings may have changed inside the context menu
         loadFiles();
         if (selectorIndex >= files.size()) {
@@ -219,9 +234,9 @@ void FileBrowserActivity::loop() {
           if (menuRes) {
             switch (menuRes->action) {
               case 1:  // Delete
-                doDelete(fullPath);
+                doDelete(fullPath, isDir);
                 return;
-              case 2:  // File info
+              case 2:  // File info (files only)
                 startActivityForResult(
                     std::make_unique<FileInfoActivity>(renderer, mappedInput, entryName, cleanBasePath, entrySize),
                     [](const ActivityResult&) {});
@@ -235,7 +250,8 @@ void FileBrowserActivity::loop() {
         requestUpdate(true);
       };
 
-      startActivityForResult(std::make_unique<FileContextMenuActivity>(renderer, mappedInput, entry.name), handler);
+      startActivityForResult(std::make_unique<FileContextMenuActivity>(renderer, mappedInput, entry.name, isDir),
+                             handler);
       return;
     } else {
       // --- SHORT PRESS: open/navigate ---
