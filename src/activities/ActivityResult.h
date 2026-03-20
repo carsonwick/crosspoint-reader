@@ -50,8 +50,12 @@ struct FootnoteResult {
   std::string href;
 };
 
+struct BatchActionResult {
+  int action = -1;  // 1 = delete, 2 = clear progress
+};
+
 using ResultVariant = std::variant<std::monostate, WifiResult, KeyboardResult, MenuResult, ChapterResult, PercentResult,
-                                   PageResult, SyncResult, NetworkModeResult, FootnoteResult>;
+                                   PageResult, SyncResult, NetworkModeResult, FootnoteResult, BatchActionResult>;
 
 struct ActivityResult {
   bool isCancelled = false;

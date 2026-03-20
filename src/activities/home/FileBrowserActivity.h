@@ -22,6 +22,14 @@ class FileBrowserActivity final : public Activity {
   void doDelete(const std::string& fullPath, bool isDirectory, std::function<void()> onCancel = {});
   void showContextMenu(std::string entryName, std::string cleanBasePath, uint32_t entrySize, bool isDir);
 
+  enum class BatchAction { NONE, DELETE, CLEAR_PROGRESS };
+  BatchAction pendingBatchAction = BatchAction::NONE;
+  std::vector<bool> selectionState;
+
+  void enterSelectionMode(BatchAction action, const std::string& preSelectedName);
+  void executeBatchAction();
+  int countSelected() const;
+
   ButtonNavigator buttonNavigator;
 
   size_t selectorIndex = 0;

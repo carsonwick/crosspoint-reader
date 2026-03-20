@@ -4,6 +4,7 @@
 #include <GfxRenderer.h>
 #include <I18n.h>
 
+#include "../ActivityResult.h"
 #include "CrossPointSettings.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -12,6 +13,8 @@ namespace {
 constexpr int MAIN_ITEM_COUNT = 3;
 constexpr int MAIN_ITEM_COUNT_EPUB = 4;
 constexpr int SORT_ITEM_COUNT = 6;
+constexpr int BATCH_ITEM_COUNT = 2;
+const StrId BATCH_LABELS[] = {StrId::STR_DELETE_FILES, StrId::STR_CLEAR_PROGRESS};
 
 const StrId MAIN_LABELS[] = {StrId::STR_SORT_BY, StrId::STR_DELETE, StrId::STR_FILE_INFO};
 
@@ -55,19 +58,25 @@ void FileContextMenuActivity::onEnter() {
 }
 
 static int mainItemCount(bool isDirectory, const std::string& filename) {
-  if (isDirectory) return 2;
-  if (FsHelpers::hasEpubExtension(filename)) return MAIN_ITEM_COUNT_EPUB;
-  return MAIN_ITEM_COUNT;
+  if (isDirectory) return 3;
+  if (FsHelpers::hasEpubExtension(filename)) return MAIN_ITEM_COUNT_EPUB + 1;
+  return MAIN_ITEM_COUNT + 1;
 }
 
 void FileContextMenuActivity::loop() {
   const int mainCount = mainItemCount(isDirectory, filename);
-  const int itemCount = (state == State::MAIN) ? mainCount : SORT_ITEM_COUNT;
+  const int itemCount = (state == State::MAIN)   ? mainCount
+                        : (state == State::SORT) ? SORT_ITEM_COUNT
+                                                 : BATCH_ITEM_COUNT;
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
     if (state == State::MAIN) {
       if (mainIndex == 0) {
         state = State::SORT;
+        requestUpdate(true);
+      } else if (static_cast<int>(mainIndex) == mainCount - 1) {
+        state = State::BATCH_ACTION_PICK;
+        batchIndex = 0;
         requestUpdate(true);
       } else {
         MenuResult result;
@@ -75,18 +84,23 @@ void FileContextMenuActivity::loop() {
         setResult(ActivityResult{result});
         finish();
       }
-    } else {
+    } else if (state == State::SORT) {
       SETTINGS.fileSortMode = SORT_MODES[sortIndex];
       SETTINGS.fileSortDirection = SORT_DIRS[sortIndex];
       SETTINGS.saveToFile();
       state = State::MAIN;
       requestUpdate(true);
+    } else {
+      BatchActionResult result;
+      result.action = static_cast<int>(batchIndex) + 1;
+      setResult(ActivityResult{result});
+      finish();
     }
     return;
   }
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
-    if (state == State::SORT) {
+    if (state == State::SORT || state == State::BATCH_ACTION_PICK) {
       state = State::MAIN;
       requestUpdate(true);
     } else {
@@ -101,8 +115,10 @@ void FileContextMenuActivity::loop() {
   buttonNavigator.onNextRelease([this, itemCount] {
     if (state == State::MAIN) {
       mainIndex = static_cast<size_t>(ButtonNavigator::nextIndex(static_cast<int>(mainIndex), itemCount));
-    } else {
+    } else if (state == State::SORT) {
       sortIndex = static_cast<size_t>(ButtonNavigator::nextIndex(static_cast<int>(sortIndex), itemCount));
+    } else {
+      batchIndex = static_cast<size_t>(ButtonNavigator::nextIndex(static_cast<int>(batchIndex), itemCount));
     }
     requestUpdate();
   });
@@ -110,8 +126,10 @@ void FileContextMenuActivity::loop() {
   buttonNavigator.onPreviousRelease([this, itemCount] {
     if (state == State::MAIN) {
       mainIndex = static_cast<size_t>(ButtonNavigator::previousIndex(static_cast<int>(mainIndex), itemCount));
-    } else {
+    } else if (state == State::SORT) {
       sortIndex = static_cast<size_t>(ButtonNavigator::previousIndex(static_cast<int>(sortIndex), itemCount));
+    } else {
+      batchIndex = static_cast<size_t>(ButtonNavigator::previousIndex(static_cast<int>(batchIndex), itemCount));
     }
     requestUpdate();
   });
@@ -136,23 +154,34 @@ void FileContextMenuActivity::render(RenderLock&&) {
   renderer.fillRect(overlayX, overlayY, overlayW, overlayH, false);
 
   // Header: same style as regular header, battery suppressed
-  const char* rawTitle = (state == State::MAIN) ? filename.c_str() : tr(STR_SORT_BY);
+  const char* rawTitle = (state == State::MAIN)   ? filename.c_str()
+                         : (state == State::SORT) ? tr(STR_SORT_BY)
+                                                  : tr(STR_SELECT_MULTIPLE);
   GUI.drawHeader(renderer, Rect{overlayX, overlayY, overlayW, m.headerHeight}, rawTitle, nullptr, false);
 
   const int listTop = overlayY + m.headerHeight + m.verticalSpacing;
-  const int selectedIndex = static_cast<int>(state == State::MAIN ? mainIndex : sortIndex);
   const int mainCount = mainItemCount(isDirectory, filename);
-  const int itemCount = state == State::MAIN ? mainCount : SORT_ITEM_COUNT;
+  const int selectedIndex = static_cast<int>(state == State::MAIN   ? mainIndex
+                                             : state == State::SORT ? sortIndex
+                                                                    : batchIndex);
+  const int itemCount = (state == State::MAIN)   ? mainCount
+                        : (state == State::SORT) ? SORT_ITEM_COUNT
+                                                 : BATCH_ITEM_COUNT;
 
   if (state == State::MAIN) {
-    GUI.drawList(renderer, Rect{overlayX, listTop, overlayW, listH}, itemCount, selectedIndex, [this](int i) {
-      if (i == 1 && isDirectory) return std::string(I18N.get(StrId::STR_DELETE_FOLDER));
-      if (i == 3) return std::string(I18N.get(StrId::STR_CLEAR_PROGRESS));
-      return std::string(I18N.get(MAIN_LABELS[i]));
-    });
-  } else {
+    GUI.drawList(renderer, Rect{overlayX, listTop, overlayW, listH}, itemCount, selectedIndex,
+                 [this, mainCount](int i) {
+                   if (i == mainCount - 1) return std::string(I18N.get(StrId::STR_SELECT_MULTIPLE));
+                   if (i == 1 && isDirectory) return std::string(I18N.get(StrId::STR_DELETE_FOLDER));
+                   if (i == 3) return std::string(I18N.get(StrId::STR_CLEAR_PROGRESS));
+                   return std::string(I18N.get(MAIN_LABELS[i]));
+                 });
+  } else if (state == State::SORT) {
     GUI.drawList(renderer, Rect{overlayX, listTop, overlayW, listH}, itemCount, selectedIndex,
                  [](int i) { return std::string(I18N.get(SORT_LABELS[i])); });
+  } else {
+    GUI.drawList(renderer, Rect{overlayX, listTop, overlayW, listH}, itemCount, selectedIndex,
+                 [](int i) { return std::string(I18N.get(BATCH_LABELS[i])); });
   }
 
   const auto btnLabels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_OPEN), tr(STR_DIR_UP), tr(STR_DIR_DOWN));

@@ -15,12 +15,13 @@ class FileContextMenuActivity final : public Activity {
   void render(RenderLock&&) override;
 
  private:
-  enum class State { MAIN, SORT };
+  enum class State { MAIN, SORT, BATCH_ACTION_PICK };
 
   std::string filename;
   bool isDirectory;
   State state = State::MAIN;
   size_t mainIndex = 0;
   size_t sortIndex = 0;
+  size_t batchIndex = 0;
   ButtonNavigator buttonNavigator;
 };

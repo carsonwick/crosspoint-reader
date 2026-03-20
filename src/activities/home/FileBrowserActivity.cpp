@@ -145,6 +145,7 @@ void FileBrowserActivity::onEnter() {
 void FileBrowserActivity::onExit() {
   Activity::onExit();
   files.clear();
+  selectionState.clear();
 }
 
 void FileBrowserActivity::clearFileMetadata(const std::string& fullPath) {
@@ -152,6 +153,55 @@ void FileBrowserActivity::clearFileMetadata(const std::string& fullPath) {
     Epub(fullPath, "/.crosspoint").clearCache();
     LOG_DBG("FileBrowser", "Cleared metadata cache for: %s", fullPath.c_str());
   }
+}
+
+int FileBrowserActivity::countSelected() const {
+  int count = 0;
+  for (bool s : selectionState) {
+    if (s) count++;
+  }
+  return count;
+}
+
+void FileBrowserActivity::enterSelectionMode(BatchAction action, const std::string& preSelectedName) {
+  pendingBatchAction = action;
+  selectionState.assign(files.size(), false);
+  const size_t idx = findEntry(preSelectedName);
+  if (idx < selectionState.size()) {
+    selectionState[idx] = true;
+    selectorIndex = idx;
+  }
+}
+
+void FileBrowserActivity::executeBatchAction() {
+  std::string cleanBase = basepath;
+  if (cleanBase.back() != '/') cleanBase += "/";
+
+  for (size_t i = 0; i < files.size() && i < selectionState.size(); i++) {
+    if (!selectionState[i]) continue;
+    const std::string fullPath = cleanBase + files[i].name;
+    if (pendingBatchAction == BatchAction::DELETE) {
+      const bool isDir = (files[i].name.back() == '/');
+      if (isDir) {
+        std::string dirPath = fullPath;
+        if (!dirPath.empty() && dirPath.back() == '/') dirPath.pop_back();
+        Storage.removeDir(dirPath.c_str());
+      } else {
+        clearFileMetadata(fullPath);
+        Storage.remove(fullPath.c_str());
+      }
+    } else if (pendingBatchAction == BatchAction::CLEAR_PROGRESS) {
+      clearFileMetadata(fullPath);
+    }
+  }
+
+  pendingBatchAction = BatchAction::NONE;
+  selectionState.clear();
+  loadFiles();
+  if (selectorIndex >= files.size()) {
+    selectorIndex = files.empty() ? 0 : files.size() - 1;
+  }
+  requestUpdate(true);
 }
 
 void FileBrowserActivity::showContextMenu(std::string entryName, std::string cleanBasePath, uint32_t entrySize,
@@ -169,6 +219,13 @@ void FileBrowserActivity::showContextMenu(std::string entryName, std::string cle
         }
 
         if (!res.isCancelled) {
+          const auto* batchRes = std::get_if<BatchActionResult>(&res.data);
+          if (batchRes) {
+            enterSelectionMode(batchRes->action == 1 ? BatchAction::DELETE : BatchAction::CLEAR_PROGRESS, entryName);
+            requestUpdate(true);
+            return;
+          }
+
           const auto* menuRes = std::get_if<MenuResult>(&res.data);
           if (menuRes) {
             switch (menuRes->action) {
@@ -255,6 +312,66 @@ void FileBrowserActivity::loop() {
     basepath = "/";
     loadFiles();
     selectorIndex = 0;
+    return;
+  }
+
+  if (pendingBatchAction != BatchAction::NONE) {
+    const int listSize = static_cast<int>(files.size());
+    const int pageItems = UITheme::getNumberOfItemsPerPage(renderer, true, false, true, false);
+
+    if (mappedInput.wasReleased(MappedInputManager::Button::Right)) {
+      const int count = countSelected();
+      if (count > 0) {
+        const char* actionLabel =
+            (pendingBatchAction == BatchAction::DELETE) ? tr(STR_DELETE_FILES) : tr(STR_CLEAR_PROGRESS);
+        char heading[80];
+        snprintf(heading, sizeof(heading), "%s (%d)?", actionLabel, count);
+        startActivityForResult(std::make_unique<ConfirmationActivity>(renderer, mappedInput, heading, "", true),
+                               [this](const ActivityResult& res) {
+                                 if (!res.isCancelled) {
+                                   executeBatchAction();
+                                 } else {
+                                   requestUpdate(true);
+                                 }
+                               });
+      }
+      return;
+    }
+
+    if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
+      pendingBatchAction = BatchAction::NONE;
+      selectionState.clear();
+      requestUpdate(true);
+      return;
+    }
+
+    if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+      if (!files.empty() && selectorIndex < selectionState.size()) {
+        selectionState[selectorIndex] = !selectionState[selectorIndex];
+        requestUpdate();
+      }
+      return;
+    }
+
+    buttonNavigator.onRelease({MappedInputManager::Button::Down}, [this, listSize] {
+      selectorIndex = static_cast<size_t>(ButtonNavigator::nextIndex(static_cast<int>(selectorIndex), listSize));
+      requestUpdate();
+    });
+    buttonNavigator.onRelease({MappedInputManager::Button::Up, MappedInputManager::Button::Left}, [this, listSize] {
+      selectorIndex = static_cast<size_t>(ButtonNavigator::previousIndex(static_cast<int>(selectorIndex), listSize));
+      requestUpdate();
+    });
+    buttonNavigator.onContinuous({MappedInputManager::Button::Down}, [this, listSize, pageItems] {
+      selectorIndex =
+          static_cast<size_t>(ButtonNavigator::nextPageIndex(static_cast<int>(selectorIndex), listSize, pageItems));
+      requestUpdate();
+    });
+    buttonNavigator.onContinuous({MappedInputManager::Button::Up, MappedInputManager::Button::Left}, [this, listSize,
+                                                                                                      pageItems] {
+      selectorIndex =
+          static_cast<size_t>(ButtonNavigator::previousPageIndex(static_cast<int>(selectorIndex), listSize, pageItems));
+      requestUpdate();
+    });
     return;
   }
 
@@ -345,6 +462,52 @@ void FileBrowserActivity::render(RenderLock&&) {
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();
   const auto& metrics = UITheme::getInstance().getMetrics();
+
+  if (pendingBatchAction != BatchAction::NONE) {
+    const char* actionTitle =
+        (pendingBatchAction == BatchAction::DELETE) ? tr(STR_DELETE_FILES) : tr(STR_CLEAR_PROGRESS);
+    GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, actionTitle);
+
+    const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+    const int contentHeight = pageHeight - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing;
+    const int rowHeight = metrics.listRowHeight;
+    const int pageItems = contentHeight / rowHeight;
+    const int pageStart = static_cast<int>(selectorIndex) / pageItems * pageItems;
+
+    constexpr int cbSize = 14;
+    constexpr int cbLeftMargin = 6;
+    constexpr int cbTotalWidth = cbLeftMargin + cbSize + 6;
+
+    // Draw list shifted right to make room for checkboxes
+    if (!files.empty()) {
+      GUI.drawList(
+          renderer, Rect{cbTotalWidth, contentTop, pageWidth - cbTotalWidth, contentHeight},
+          static_cast<int>(files.size()), static_cast<int>(selectorIndex),
+          [this](int index) { return getFileName(files[index].name); }, nullptr,
+          [this](int index) { return UITheme::getFileIcon(files[index].name); });
+    }
+
+    // Draw checkboxes on top (after drawList so they appear above selection highlight)
+    for (int i = pageStart; i < static_cast<int>(files.size()) && i < pageStart + pageItems; i++) {
+      const int itemY = contentTop + (i - pageStart) * rowHeight;
+      const int cbY = itemY + (rowHeight - cbSize) / 2;
+      renderer.fillRect(cbLeftMargin, cbY, cbSize, cbSize, true);
+      renderer.fillRect(cbLeftMargin + 1, cbY + 1, cbSize - 2, cbSize - 2, false);
+      if (i < static_cast<int>(selectionState.size()) && selectionState[i]) {
+        renderer.fillRect(cbLeftMargin + 3, cbY + 3, cbSize - 6, cbSize - 6, true);
+      }
+    }
+
+    // Button hints: Cancel · Toggle · (empty) · Done (N)
+    const int count = countSelected();
+    char doneLabel[24];
+    snprintf(doneLabel, sizeof(doneLabel), "%s (%d)", tr(STR_DONE), count);
+    const auto labels = mappedInput.mapLabels(tr(STR_CANCEL), tr(STR_TOGGLE), "", doneLabel);
+    GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+
+    renderer.displayBuffer();
+    return;
+  }
 
   std::string folderName = (basepath == "/") ? tr(STR_SD_CARD) : basepath.substr(basepath.rfind('/') + 1);
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, folderName.c_str());
