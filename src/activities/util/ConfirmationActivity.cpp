@@ -1,13 +1,14 @@
 #include "ConfirmationActivity.h"
 
+#include <GfxRenderer.h>
 #include <I18n.h>
 
 #include "../../components/UITheme.h"
 #include "HalDisplay.h"
 
 ConfirmationActivity::ConfirmationActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
-                                           const std::string& heading, const std::string& body)
-    : Activity("Confirmation", renderer, mappedInput), heading(heading), body(body) {}
+                                           const std::string& heading, const std::string& body, bool overlay)
+    : Activity("Confirmation", renderer, mappedInput), heading(heading), body(body), overlay(overlay) {}
 
 void ConfirmationActivity::onEnter() {
   Activity::onEnter();
@@ -33,10 +34,28 @@ void ConfirmationActivity::onEnter() {
 }
 
 void ConfirmationActivity::render(RenderLock&& lock) {
-  renderer.clearScreen();
+  if (!overlay) {
+    renderer.clearScreen();
+  } else {
+    const auto pw = renderer.getScreenWidth();
+    const auto ph = renderer.getScreenHeight();
+    const auto& m = UITheme::getInstance().getMetrics();
+
+    const int totalTextH = (!safeHeading.empty() ? lineHeight : 0) +
+                           (!safeHeading.empty() && !safeBody.empty() ? spacing : 0) +
+                           (!safeBody.empty() ? lineHeight : 0);
+    const int overlayW = pw - 2 * m.contentSidePadding;
+    const int overlayX = m.contentSidePadding;
+    const int overlayH = margin * 2 + totalTextH;
+    const int overlayY = (ph - m.buttonHintsHeight - overlayH) / 2;
+
+    renderer.fillRect(overlayX - 2, overlayY - 2, overlayW + 4, overlayH + 4, true);
+    renderer.fillRect(overlayX, overlayY, overlayW, overlayH, false);
+
+    startY = overlayY + margin;
+  }
 
   int currentY = startY;
-  LOG_DBG("CONF", "currentY: %d", currentY);
   // Draw Heading
   if (!safeHeading.empty()) {
     renderer.drawCenteredText(fontId, currentY, safeHeading.c_str(), true, EpdFontFamily::BOLD);
@@ -48,7 +67,6 @@ void ConfirmationActivity::render(RenderLock&& lock) {
     renderer.drawCenteredText(fontId, currentY, safeBody.c_str(), true, EpdFontFamily::REGULAR);
   }
 
-  // Draw UI Elements
   const auto labels = mappedInput.mapLabels("", "", I18N.get(StrId::STR_CANCEL), I18N.get(StrId::STR_CONFIRM));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 

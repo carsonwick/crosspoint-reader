@@ -127,14 +127,14 @@ void FileContextMenuActivity::render(RenderLock&&) {
   renderer.fillRect(overlayX - 2, overlayY - 2, overlayW + 4, overlayH + 4, true);
   renderer.fillRect(overlayX, overlayY, overlayW, overlayH, false);
 
-  // Header: filename in MAIN state, "Sort by" in SORT state
-  if (state == State::MAIN) {
-    const std::string title =
-        renderer.truncatedText(UI_10_FONT_ID, filename.c_str(), overlayW - 2 * m.contentSidePadding);
-    GUI.drawHeader(renderer, Rect{overlayX, overlayY, overlayW, m.headerHeight}, title.c_str());
-  } else {
-    GUI.drawHeader(renderer, Rect{overlayX, overlayY, overlayW, m.headerHeight}, tr(STR_SORT_BY));
-  }
+  // Header: black bar with centred title — no battery indicator
+  const char* rawTitle = (state == State::MAIN) ? filename.c_str() : tr(STR_SORT_BY);
+  const std::string title =
+      renderer.truncatedText(UI_12_FONT_ID, rawTitle, overlayW - 2 * m.contentSidePadding, EpdFontFamily::BOLD);
+  renderer.fillRect(overlayX, overlayY, overlayW, m.headerHeight, true);
+  const int titleW = renderer.getTextWidth(UI_12_FONT_ID, title.c_str(), EpdFontFamily::BOLD);
+  const int titleX = overlayX + (overlayW - titleW) / 2;
+  renderer.drawText(UI_12_FONT_ID, titleX, overlayY + 5, title.c_str(), false, EpdFontFamily::BOLD);
 
   const int listTop = overlayY + m.headerHeight + m.verticalSpacing;
   const int selectedIndex = static_cast<int>(state == State::MAIN ? mainIndex : sortIndex);

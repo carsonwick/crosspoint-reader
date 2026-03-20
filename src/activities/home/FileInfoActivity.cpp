@@ -31,25 +31,36 @@ void FileInfoActivity::loop() {
 }
 
 void FileInfoActivity::render(RenderLock&&) {
-  renderer.clearScreen();
-
-  const auto pageWidth = renderer.getScreenWidth();
-  const auto pageHeight = renderer.getScreenHeight();
-  const auto& metrics = UITheme::getInstance().getMetrics();
-
-  // Truncate filename for header display
-  const int maxWidth = pageWidth - metrics.contentSidePadding * 2;
-  const std::string safeTitle = renderer.truncatedText(UI_10_FONT_ID, filename.c_str(), maxWidth);
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, safeTitle.c_str());
+  // Overlay — no clearScreen(); draw on top of the file list
+  const auto pw = renderer.getScreenWidth();
+  const auto ph = renderer.getScreenHeight();
+  const auto& m = UITheme::getInstance().getMetrics();
 
   const int lineHeight = renderer.getLineHeight(UI_10_FONT_ID);
-  const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+  const int contentH = 2 * lineHeight + m.verticalSpacing;
+  const int overlayW = pw - 2 * m.contentSidePadding;
+  const int overlayX = m.contentSidePadding;
+  const int overlayH = m.headerHeight + m.verticalSpacing + contentH + m.verticalSpacing;
+  const int overlayY = (ph - m.buttonHintsHeight - overlayH) / 2;
+
+  renderer.fillRect(overlayX - 2, overlayY - 2, overlayW + 4, overlayH + 4, true);
+  renderer.fillRect(overlayX, overlayY, overlayW, overlayH, false);
+
+  // Header: black bar with centred filename — no battery indicator
+  const int innerW = overlayW - 2 * m.contentSidePadding;
+  const std::string safeTitle = renderer.truncatedText(UI_12_FONT_ID, filename.c_str(), innerW, EpdFontFamily::BOLD);
+  renderer.fillRect(overlayX, overlayY, overlayW, m.headerHeight, true);
+  const int titleW = renderer.getTextWidth(UI_12_FONT_ID, safeTitle.c_str(), EpdFontFamily::BOLD);
+  const int titleX = overlayX + (overlayW - titleW) / 2;
+  renderer.drawText(UI_12_FONT_ID, titleX, overlayY + 5, safeTitle.c_str(), false, EpdFontFamily::BOLD);
+
+  const int contentTop = overlayY + m.headerHeight + m.verticalSpacing;
 
   // Row 1: Path
   char pathLine[256];
   snprintf(pathLine, sizeof(pathLine), "%s: %s", tr(STR_PATH), basepath.c_str());
-  const std::string safePath = renderer.truncatedText(UI_10_FONT_ID, pathLine, maxWidth);
-  renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, contentTop, safePath.c_str(), true);
+  const std::string safePath = renderer.truncatedText(UI_10_FONT_ID, pathLine, innerW);
+  renderer.drawText(UI_10_FONT_ID, overlayX + m.contentSidePadding, contentTop, safePath.c_str(), true);
 
   // Row 2: File size
   char sizeBuf[32];
@@ -63,7 +74,7 @@ void FileInfoActivity::render(RenderLock&&) {
 
   char sizeLine[64];
   snprintf(sizeLine, sizeof(sizeLine), "%s: %s", tr(STR_FILE_SIZE), sizeBuf);
-  renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, contentTop + lineHeight + metrics.verticalSpacing,
+  renderer.drawText(UI_10_FONT_ID, overlayX + m.contentSidePadding, contentTop + lineHeight + m.verticalSpacing,
                     sizeLine, true);
 
   const auto btnLabels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");

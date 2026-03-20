@@ -15,6 +15,7 @@ class ConfirmationActivity : public Activity {
   const int spacing = 30;
   const int fontId = UI_10_FONT_ID;
 
+  bool overlay;
   std::string safeHeading;
   std::string safeBody;
   int startY = 0;
@@ -22,7 +23,7 @@ class ConfirmationActivity : public Activity {
 
  public:
   ConfirmationActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, const std::string& heading,
-                       const std::string& body);
+                       const std::string& body, bool overlay = false);
 
   void onEnter() override;
   void loop() override;
