@@ -70,7 +70,7 @@ void FileBrowserActivity::sortFileList(std::vector<FileEntry>& entries) {
     int cmp = 0;
     switch (mode) {
       case CrossPointSettings::SORT_DATE:
-        cmp = (a.dirIndex != b.dirIndex) ? (a.dirIndex < b.dirIndex ? -1 : 1) : naturalCompare(a.name, b.name);
+        cmp = (a.dateTime != b.dateTime) ? (a.dateTime < b.dateTime ? -1 : 1) : naturalCompare(a.name, b.name);
         break;
       case CrossPointSettings::SORT_SIZE:
         cmp = (a.size != b.size) ? (a.size < b.size ? -1 : 1) : naturalCompare(a.name, b.name);
@@ -97,7 +97,6 @@ void FileBrowserActivity::loadFiles() {
   root.rewindDirectory();
 
   char name[500];
-  uint32_t idx = 0;
   for (auto file = root.openNextFile(); file; file = root.openNextFile()) {
     file.getName(name, sizeof(name));
 
@@ -106,24 +105,19 @@ void FileBrowserActivity::loadFiles() {
       continue;
     }
 
-    // Hidden files always reserve a FAT slot so dirIndex is stable
-    // regardless of the showHiddenFiles setting.
     if (!SETTINGS.showHiddenFiles && name[0] == '.') {
-      idx++;
       file.close();
       continue;
     }
 
-    // idx is claimed only when an entry is actually pushed, so
-    // unsupported-extension files never consume a slot — except hidden ones,
-    // which always reserve a FAT slot to keep dirIndex stable across setting changes.
-    const bool isHidden = (name[0] == '.');
+    uint16_t fdate = 0, ftime = 0;
+    file.getModifyDateTime(&fdate, &ftime);
+    const uint32_t dateTime = (static_cast<uint32_t>(fdate) << 16) | ftime;
+
     if (file.isDirectory()) {
-      files.push_back({std::string(name) + "/", 0, idx++});
+      files.push_back({std::string(name) + "/", 0, dateTime});
     } else if (isSupportedFile(name)) {
-      files.push_back({std::string(name), static_cast<uint32_t>(file.fileSize()), idx++});
-    } else if (isHidden) {
-      idx++;
+      files.push_back({std::string(name), static_cast<uint32_t>(file.fileSize()), dateTime});
     }
     file.close();
   }

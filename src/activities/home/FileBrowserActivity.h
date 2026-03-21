@@ -14,7 +14,7 @@ class FileBrowserActivity final : public Activity {
   struct FileEntry {
     std::string name;   // filename; trailing '/' = directory
     uint32_t size;      // file size in bytes; 0 for directories
-    uint32_t dirIndex;  // position in FAT directory — reflects the order files were added to the card
+    uint32_t dateTime;  // FAT modify timestamp packed as (date << 16) | time; 0 = unknown
   };
 
   // Deletion
