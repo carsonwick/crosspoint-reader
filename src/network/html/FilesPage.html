@@ -4531,8 +4531,8 @@ function uploadFileWebSocket(file, onProgress, onComplete, onError) {
 
     ws.onopen = function() {
       console.log('[WS] Connected, starting upload:', file.name);
-      // Send start message: START:<filename>:<size>:<path>
-      ws.send(`START:${file.name}:${file.size}:${currentPath}`);
+      // Send start message: START:<filename>:<size>:<path>:<unix_ts>
+      ws.send(`START:${file.name}:${file.size}:${currentPath}:${Math.floor(Date.now() / 1000)}`);
     };
 
     ws.onmessage = async function(event) {
@@ -4635,7 +4635,7 @@ function uploadFileHTTP(file, onProgress, onComplete, onError) {
 
     const xhr = new XMLHttpRequest();
     currentUploadXhr = xhr;
-    xhr.open('POST', '/upload?path=' + encodeURIComponent(currentPath), true);
+    xhr.open('POST', '/upload?path=' + encodeURIComponent(currentPath) + '&t=' + Math.floor(Date.now() / 1000), true);
 
     xhr.upload.onprogress = function(e) {
       if (e.lengthComputable && onProgress) {

@@ -7,6 +7,7 @@
 #include <Logging.h>
 #include <WiFi.h>
 #include <esp_task_wdt.h>
+#include <sys/time.h>
 
 #include <algorithm>
 
@@ -25,6 +26,16 @@ const char* HIDDEN_ITEMS[] = {"System Volume Information", "XTCache"};
 constexpr size_t HIDDEN_ITEMS_COUNT = sizeof(HIDDEN_ITEMS) / sizeof(HIDDEN_ITEMS[0]);
 constexpr uint16_t UDP_PORTS[] = {54982, 48123, 39001, 44044, 59678};
 constexpr uint16_t LOCAL_UDP_PORT = 8134;
+
+// Set device clock from a Unix timestamp supplied by the browser.
+// Only applied if the value is plausible (>= 2020-01-01) so a
+// misconfigured client cannot corrupt the clock.
+static void applyClientTime(long unixTs) {
+  if (unixTs < 1577836800L) return;  // sanity: reject anything before 2020
+  const struct timeval tv = {.tv_sec = static_cast<time_t>(unixTs), .tv_usec = 0};
+  settimeofday(&tv, nullptr);
+  LOG_DBG("WEB", "Clock set from client: %ld", unixTs);
+}
 
 // Static pointer for WebSocket callback (WebSocketsServer requires C-style callback)
 CrossPointWebServer* wsInstance = nullptr;
@@ -620,6 +631,8 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
     } else {
       state.path = "/";
     }
+
+    if (server->hasArg("t")) applyClientTime(server->arg("t").toInt());
 
     LOG_DBG("WEB", "[UPLOAD] START: %s to path: %s", state.fileName.c_str(), state.path.c_str());
     LOG_DBG("WEB", "[UPLOAD] Free heap: %d bytes", ESP.getFreeHeap());
@@ -1271,9 +1284,10 @@ void CrossPointWebServer::onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* 
           break;
         }
 
-        // Parse: START:<filename>:<size>:<path>
+        // Parse: START:<filename>:<size>:<path>[:<unix_ts>]
         int firstColon = msg.indexOf(':', 6);
         int secondColon = msg.indexOf(':', firstColon + 1);
+        int thirdColon = msg.indexOf(':', secondColon + 1);
 
         if (firstColon > 0 && secondColon > 0) {
           wsUploadFileName = msg.substring(6, firstColon);
@@ -1290,7 +1304,12 @@ void CrossPointWebServer::onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* 
             return;
           }
           wsUploadSize = sizeToken.toInt();
-          wsUploadPath = msg.substring(secondColon + 1);
+          if (thirdColon > 0) {
+            wsUploadPath = msg.substring(secondColon + 1, thirdColon);
+            applyClientTime(msg.substring(thirdColon + 1).toInt());
+          } else {
+            wsUploadPath = msg.substring(secondColon + 1);
+          }
           wsUploadReceived = 0;
           wsLastProgressSent = 0;
           wsUploadStartTime = millis();
