@@ -110,9 +110,12 @@ void FileBrowserActivity::loadFiles() {
       continue;
     }
 
-    uint16_t fdate = 0, ftime = 0;
-    file.getModifyDateTime(&fdate, &ftime);
-    const uint32_t dateTime = (static_cast<uint32_t>(fdate) << 16) | ftime;
+    uint16_t mdate = 0, mtime = 0, cdate = 0, ctime = 0;
+    file.getModifyDateTime(&mdate, &mtime);
+    file.getCreateDateTime(&cdate, &ctime);
+    const uint32_t modTs = (static_cast<uint32_t>(mdate) << 16) | mtime;
+    const uint32_t crtTs = (static_cast<uint32_t>(cdate) << 16) | ctime;
+    const uint32_t dateTime = modTs > crtTs ? modTs : crtTs;
 
     if (file.isDirectory()) {
       files.push_back({std::string(name) + "/", 0, dateTime});
