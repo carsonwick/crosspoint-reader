@@ -10,6 +10,9 @@
 #include <esp_task_wdt.h>
 #include <sys/time.h>
 
+#include <cerrno>
+#include <cstdlib>
+
 #include <algorithm>
 
 #include "CrossPointSettings.h"
@@ -27,19 +30,40 @@ constexpr size_t HIDDEN_ITEMS_COUNT = sizeof(HIDDEN_ITEMS) / sizeof(HIDDEN_ITEMS
 constexpr uint16_t UDP_PORTS[] = {54982, 48123, 39001, 44044, 59678};
 constexpr uint16_t LOCAL_UDP_PORT = 8134;
 
+// Parse a browser-supplied Unix timestamp string.
+// Returns true and writes to `out` only if the string is a well-formed
+// decimal integer in [1577836800, 4102444800] (2020-01-01 .. 2100-01-01).
+// strtoll detects overflow (ERANGE) and trailing garbage (endptr check) that
+// Arduino String::toInt silently ignores.
+static bool parseClientTimestamp(const char* s, long long& out) {
+  if (!s || *s == '\0') return false;
+  char* endptr = nullptr;
+  errno = 0;
+  const long long val = strtoll(s, &endptr, 10);
+  if (errno == ERANGE) return false;
+  if (endptr == s || *endptr != '\0') return false;
+  if (val < 1577836800LL || val > 4102444800LL) return false;
+  out = val;
+  return true;
+}
+
 // Set device clock from a Unix timestamp supplied by the browser.
 // Only used in AP/hotspot mode when SNTP is not active; in STA mode the
 // NTP-synced clock is authoritative and must not be overwritten by a
 // browser-supplied value.
-static void applyClientTime(long unixTs) {
-  if (unixTs < 1577836800L) return;  // sanity: reject anything before 2020
+static void applyClientTime(const char* tsStr) {
+  long long unixTs = 0;
+  if (!parseClientTimestamp(tsStr, unixTs)) {
+    LOG_DBG("WEB", "Clock sync rejected: invalid timestamp");
+    return;
+  }
   if (esp_sntp_enabled() || (WiFi.getMode() & WIFI_MODE_STA)) {
     LOG_DBG("WEB", "Clock sync from client skipped (SNTP active or STA mode)");
     return;
   }
   const struct timeval tv = {.tv_sec = static_cast<time_t>(unixTs), .tv_usec = 0};
   settimeofday(&tv, nullptr);
-  LOG_DBG("WEB", "Clock set from client: %ld", unixTs);
+  LOG_DBG("WEB", "Clock set from client: %lld", unixTs);
 }
 
 // Static pointer for WebSocket callback (WebSocketsServer requires C-style callback)
@@ -595,7 +619,7 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
       state.path = "/";
     }
 
-    if (server->hasArg("t")) applyClientTime(server->arg("t").toInt());
+    if (server->hasArg("t")) applyClientTime(server->arg("t").c_str());
 
     LOG_DBG("WEB", "[UPLOAD] START: %s to path: %s", state.fileName.c_str(), state.path.c_str());
     LOG_DBG("WEB", "[UPLOAD] Free heap: %d bytes", ESP.getFreeHeap());
@@ -1255,7 +1279,7 @@ void CrossPointWebServer::onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* 
           wsUploadSize = msg.substring(firstColon + 1, secondColon).toInt();
           if (thirdColon > 0) {
             wsUploadPath = msg.substring(secondColon + 1, thirdColon);
-            applyClientTime(msg.substring(thirdColon + 1).toInt());
+            applyClientTime(msg.substring(thirdColon + 1).c_str());
           } else {
             wsUploadPath = msg.substring(secondColon + 1);
           }
