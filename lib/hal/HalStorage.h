@@ -53,6 +53,7 @@ class HalStorage {
   // Returns free space in bytes (cached — fast).
   uint64_t sdFreeBytes() const;
 
+
   static HalStorage& getInstance() { return instance; }
 
   class StorageLock;  // private class, used internally
@@ -65,7 +66,7 @@ class HalStorage {
 
   uint64_t sdTotalBytesCache = 0;
   bool sdTotalBytesValid = false;
-  // Free space is updated by a background task every 60 s.
+  // Free space in MB, updated by a background task every 60 s.
   // uint32_t (MB precision) is written atomically on single-core RISC-V — no mutex needed for reads.
   volatile uint32_t sdFreeMB = 0;
 

@@ -76,21 +76,26 @@ bool HalStorage::writeFile(const char* path, const String& content) {
 
 bool HalStorage::ensureDirectoryExists(const char* path) { HAL_STORAGE_WRAPPED_CALL(ensureDirectoryExists, path); }
 
-uint64_t HalStorage::sdTotalBytes() const {
-  StorageLock lock;
-  return SDCard.sdTotalBytes();
+uint64_t HalStorage::sdTotalBytes() const { return sdTotalBytesCache; }
+
+uint64_t HalStorage::sdFreeBytes() const {
+  // sdFreeMB is a volatile uint32_t updated by the background task.
+  // 32-bit reads are atomic on single-core RISC-V — no mutex needed.
+  return (uint64_t)sdFreeMB * 1000000ULL;
 }
 
 uint64_t HalStorage::sdUsedBytes() const {
-  StorageLock lock;
-  return SDCard.sdUsedBytes();
+  const uint64_t free = sdFreeBytes();
+  return sdTotalBytesCache > free ? sdTotalBytesCache - free : 0;
 }
 
-uint64_t HalStorage::sdFreeBytes() const {
-  uint64_t total = sdTotalBytes();
-  uint64_t used = sdUsedBytes();
-  if (total <= used) return 0;
-  return total - used;
+void HalStorage::sdFreeUpdateTask(void* param) {
+  auto& self = *static_cast<HalStorage*>(param);
+  for (;;) {
+    vTaskDelay(pdMS_TO_TICKS(60000));  // refresh every 60 seconds
+    StorageLock lock;                  // competes normally with other SD users
+    self.sdFreeMB = (uint32_t)(SDCard.cardFreeBytes() / 1000000ULL);
+  }
 }
 
 class HalFile::Impl {
