@@ -49,12 +49,10 @@ class HalStorage {
   // Returns total SD card size in bytes (cached — fast, no SD access).
   uint64_t sdTotalBytes() const;
   // Returns used space in bytes (total minus free, both cached — fast).
-  // NOTE: quantised to 1 MB increments — the internal cache stores megabytes,
-  // not exact bytes. Do not use for byte-precise accounting.
+  // NOTE: quantised to 1 KiB increments — the internal cache stores kibibytes.
   uint64_t sdUsedBytes() const;
   // Returns free space in bytes (cached — fast, no SD access).
-  // NOTE: quantised to 1 MB increments — the internal cache stores megabytes,
-  // not exact bytes. Do not use for byte-precise accounting.
+  // NOTE: quantised to 1 KiB increments — the internal cache stores kibibytes.
   uint64_t sdFreeBytes() const;
 
   static HalStorage& getInstance() { return instance; }
@@ -68,10 +66,12 @@ class HalStorage {
   bool initialized = false;
   SemaphoreHandle_t storageMutex = nullptr;
 
-  // Free-space cache. sdTotalBytes is populated once in begin() and never changes.
-  // sdFreeMB is a uint32_t written atomically on single-core RISC-V — no mutex needed for reads.
+  // Free-space cache. sdTotalBytesCache is populated once in begin() and never changes.
+  // sdFreeKiB stores free space in 1 KiB units (cardFreeBytes / 1024), giving ~1 KiB
+  // quantisation while keeping the field a uint32_t (atomic on 32-bit RISC-V, no mutex needed).
+  // Supports SD cards up to ~4 TB (2^32 * 1024).
   uint64_t sdTotalBytesCache = 0;
-  volatile uint32_t sdFreeMB = 0;
+  volatile uint32_t sdFreeKiB = 0;
 
   // Background task: blocks until notified, then waits for a 5-second quiet window
   // (debounce) before walking the FAT to refresh sdFreeMB. This ensures that even a

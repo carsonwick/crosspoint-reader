@@ -25,7 +25,7 @@ bool HalStorage::begin() {
     // Pre-populate the total-bytes cache once (partition size never changes).
     sdTotalBytesCache = SDCard.cardTotalBytes();
     // Do an initial free-space walk synchronously — no other tasks are running yet during setup.
-    sdFreeMB = (uint32_t)(SDCard.cardFreeBytes() / 1000000ULL);
+    sdFreeKiB = (uint32_t)(SDCard.cardFreeBytes() / 1024ULL);
     // Start the background refresh task.
     if (xTaskCreate(sdFreeUpdateTask, "sdFree", 2048, this, 1, &sdFreeUpdateTaskHandle) != pdPASS) {
       LOG_ERR("Storage", "Failed to create sdFree task; free-space cache will not update after writes");
@@ -78,8 +78,8 @@ bool HalStorage::ensureDirectoryExists(const char* path) { HAL_STORAGE_WRAPPED_C
 uint64_t HalStorage::sdTotalBytes() const { return sdTotalBytesCache; }
 
 uint64_t HalStorage::sdFreeBytes() const {
-  // sdFreeMB is a volatile uint32_t written atomically on single-core RISC-V — no mutex needed.
-  return (uint64_t)sdFreeMB * 1000000ULL;
+  // sdFreeKiB is a volatile uint32_t written atomically on single-core RISC-V — no mutex needed.
+  return (uint64_t)sdFreeKiB * 1024ULL;
 }
 
 uint64_t HalStorage::sdUsedBytes() const {
@@ -93,7 +93,7 @@ void HalStorage::notifySdFreeUpdate() {
   } else {
     // Background task unavailable (creation failed); refresh synchronously.
     StorageLock lock;
-    sdFreeMB = (uint32_t)(SDCard.cardFreeBytes() / 1000000ULL);
+    sdFreeKiB = (uint32_t)(SDCard.cardFreeBytes() / 1024ULL);
   }
 }
 
@@ -107,7 +107,7 @@ void HalStorage::sdFreeUpdateTask(void* param) {
     while (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(5000))) {
     }  // reset window on each new notification
     StorageLock lock;
-    self.sdFreeMB = (uint32_t)(SDCard.cardFreeBytes() / 1000000ULL);
+    self.sdFreeKiB = (uint32_t)(SDCard.cardFreeBytes() / 1024ULL);
   }
 }
 
