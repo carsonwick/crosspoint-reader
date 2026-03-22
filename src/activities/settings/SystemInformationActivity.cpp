@@ -90,9 +90,7 @@ void SystemInformationActivity::render(RenderLock&&) {
   drawRow(3, tr(STR_FREE_RAM), formatBytes(status.freeHeapBytes));
   drawRow(4, tr(STR_MIN_FREE), formatBytes(status.minFreeHeapBytes));
   drawRow(5, tr(STR_MAX_BLOCK), formatBytes(status.maxAllocHeapBytes));
-  drawRow(
-      6, tr(STR_FLASH_USED),
-      formatBytes(status.flashAppUsedBytes) + " / " + formatBytes(status.flashAppUsedBytes + status.flashAppFreeBytes));
+  drawRow(6, tr(STR_FLASH), formatBytes(status.flashBytes));
   std::string batteryLabel = std::to_string(status.batteryPercent) + "%";
   if (status.charging) {
     batteryLabel += " (";
