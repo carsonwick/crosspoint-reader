@@ -61,4 +61,4 @@ class HalGPIO {
   static constexpr uint8_t BTN_POWER = 6;
 };
 
-extern HalGPIO gpio;  // Singleton
+extern HalGPIO gpio;  // Singleton defined in main.cpp
