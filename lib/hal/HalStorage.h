@@ -93,6 +93,11 @@ class HalFile : public Print {
   // Prevents read-only file closes from triggering unnecessary FAT walks.
   bool openedForWrite = false;
   explicit HalFile(std::unique_ptr<Impl> impl);
+  // Close the underlying file and notify the free-space cache if this instance
+  // was opened for writing. Idempotent; safe to call when impl is null or file
+  // is already closed. Used by operator= and ~HalFile to preserve notify
+  // semantics without duplicating the logic.
+  void release() noexcept;
 
  public:
   HalFile();

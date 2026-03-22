@@ -121,7 +121,15 @@ HalFile::HalFile() = default;
 
 HalFile::HalFile(std::unique_ptr<Impl> impl) : impl(std::move(impl)) {}
 
-HalFile::~HalFile() = default;
+void HalFile::release() noexcept {
+  if (openedForWrite && impl && impl->file.isOpen()) {
+    impl->file.close();
+    openedForWrite = false;
+    HalStorage::getInstance().notifySdFreeUpdate();
+  }
+}
+
+HalFile::~HalFile() { release(); }
 
 // Move constructor: transfer ownership and clear openedForWrite on the moved-from object
 // so a subsequent close() on it cannot trigger a spurious notify.
@@ -131,14 +139,11 @@ HalFile::HalFile(HalFile&& other) noexcept : impl(std::move(other.impl)), opened
 
 HalFile& HalFile::operator=(HalFile&& other) noexcept {
   if (this != &other) {
-    // If the existing file was write-opened and not yet closed, close it now
-    // so the free-space cache gets notified. Caller must hold StorageLock if required;
-    // HalStorage::openFileForWrite always passes a fresh HalFile (openedForWrite=false)
-    // so this branch is only reached in user-level reassignment (no lock held).
-    if (openedForWrite && impl && impl->file.isOpen()) {
-      impl->file.close();
-      HalStorage::getInstance().notifySdFreeUpdate();
-    }
+    // release() closes any write-opened file on *this and notifies the free-space
+    // cache before we overwrite impl. HalStorage::openFileForWrite always passes a
+    // fresh HalFile (openedForWrite=false) so this branch is only reached in
+    // user-level reassignment (no lock held).
+    release();
     impl = std::move(other.impl);
     openedForWrite = other.openedForWrite;
     other.openedForWrite = false;
