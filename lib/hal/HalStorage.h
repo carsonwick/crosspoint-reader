@@ -49,8 +49,12 @@ class HalStorage {
   // Returns total SD card size in bytes (cached — fast, no SD access).
   uint64_t sdTotalBytes() const;
   // Returns used space in bytes (total minus free, both cached — fast).
+  // NOTE: quantised to 1 MB increments — the internal cache stores megabytes,
+  // not exact bytes. Do not use for byte-precise accounting.
   uint64_t sdUsedBytes() const;
   // Returns free space in bytes (cached — fast, no SD access).
+  // NOTE: quantised to 1 MB increments — the internal cache stores megabytes,
+  // not exact bytes. Do not use for byte-precise accounting.
   uint64_t sdFreeBytes() const;
 
   static HalStorage& getInstance() { return instance; }

@@ -88,7 +88,13 @@ uint64_t HalStorage::sdUsedBytes() const {
 }
 
 void HalStorage::notifySdFreeUpdate() {
-  if (sdFreeUpdateTaskHandle) xTaskNotifyGive(sdFreeUpdateTaskHandle);
+  if (sdFreeUpdateTaskHandle) {
+    xTaskNotifyGive(sdFreeUpdateTaskHandle);
+  } else {
+    // Background task unavailable (creation failed); refresh synchronously.
+    StorageLock lock;
+    sdFreeMB = (uint32_t)(SDCard.cardFreeBytes() / 1000000ULL);
+  }
 }
 
 // Background task: wakes on notification, then waits for a 5-second quiet window before
@@ -125,6 +131,14 @@ HalFile::HalFile(HalFile&& other) noexcept : impl(std::move(other.impl)), opened
 
 HalFile& HalFile::operator=(HalFile&& other) noexcept {
   if (this != &other) {
+    // If the existing file was write-opened and not yet closed, close it now
+    // so the free-space cache gets notified. Caller must hold StorageLock if required;
+    // HalStorage::openFileForWrite always passes a fresh HalFile (openedForWrite=false)
+    // so this branch is only reached in user-level reassignment (no lock held).
+    if (openedForWrite && impl && impl->file.isOpen()) {
+      impl->file.close();
+      HalStorage::getInstance().notifySdFreeUpdate();
+    }
     impl = std::move(other.impl);
     openedForWrite = other.openedForWrite;
     other.openedForWrite = false;
