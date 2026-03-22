@@ -11,13 +11,13 @@
 static std::string formatBytes(uint64_t bytes) {
   char buf[16];
   if (bytes >= 1024ULL * 1024 * 1024) {
-    snprintf(buf, sizeof(buf), "%.1f GB", bytes / (1024.0 * 1024.0 * 1024.0));
+    snprintf(buf, sizeof(buf), "%.1fGB", bytes / (1024.0 * 1024.0 * 1024.0));
   } else if (bytes >= 1024ULL * 1024) {
-    snprintf(buf, sizeof(buf), "%.1f MB", bytes / (1024.0 * 1024.0));
+    snprintf(buf, sizeof(buf), "%.1fMB", bytes / (1024.0 * 1024.0));
   } else if (bytes >= 1024ULL) {
-    snprintf(buf, sizeof(buf), "%.1f KB", bytes / 1024.0);
+    snprintf(buf, sizeof(buf), "%.1fKB", bytes / 1024.0);
   } else {
-    snprintf(buf, sizeof(buf), "%llu B", static_cast<unsigned long long>(bytes));
+    snprintf(buf, sizeof(buf), "%lluB", static_cast<unsigned long long>(bytes));
   }
   return buf;
 }
@@ -96,9 +96,11 @@ void SystemInformationActivity::render(RenderLock&&) {
   drawRow(4, tr(STR_MIN_FREE), formatBytes(status.minFreeHeapBytes).c_str());
   drawRow(5, tr(STR_MAX_BLOCK), formatBytes(status.maxAllocHeapBytes).c_str());
 
-  snprintf(buf, sizeof(buf), "%s / %s", formatBytes(status.flashAppUsedBytes).c_str(),
-           formatBytes(status.flashAppUsedBytes + status.flashAppFreeBytes).c_str());
-  drawRow(6, tr(STR_FLASH_USED), buf);
+  if (status.flashAppUsedBytes > 0) {
+    snprintf(buf, sizeof(buf), "%s / %s", formatBytes(status.flashAppUsedBytes).c_str(),
+             formatBytes(status.flashAppUsedBytes + status.flashAppFreeBytes).c_str());
+    drawRow(6, tr(STR_FLASH_USED), buf);
+  }
 
   if (status.charging) {
     snprintf(buf, sizeof(buf), "%u%% (%s)", status.batteryPercent, tr(STR_CHARGING));
@@ -116,7 +118,7 @@ void SystemInformationActivity::render(RenderLock&&) {
   if (!sdStatusReady_) {
     drawRow(9, tr(STR_SD_CARD), tr(STR_READING));
   } else if (status.sdTotalBytes > 0) {
-    snprintf(buf, sizeof(buf), "%s / %s", formatBytes(status.sdUsedBytes).c_str(),
+    snprintf(buf, sizeof(buf), "%s/%s", formatBytes(status.sdUsedBytes).c_str(),
              formatBytes(status.sdTotalBytes).c_str());
     drawRow(9, tr(STR_SD_CARD), buf);
   } else {
