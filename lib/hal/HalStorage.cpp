@@ -5,10 +5,10 @@
 #include <Logging.h>
 #include <SDCardManager.h>
 #include <SdFat.h>
+#include <esp_task_wdt.h>
 
 #include <cassert>
 #include <ctime>
-#include <esp_task_wdt.h>
 
 static void sdFatDateTimeCallback(uint16_t* pdate, uint16_t* ptime) {
   struct tm timeinfo;
@@ -141,11 +141,16 @@ HalFile::HalFile() = default;
 HalFile::HalFile(std::unique_ptr<Impl> impl) : impl(std::move(impl)) {}
 
 void HalFile::release() noexcept {
-  if (openedForWrite && impl && impl->file.isOpen()) {
-    impl->file.close();
-    openedForWrite = false;
-    HalStorage::getInstance().notifySdFreeUpdate();
-  }
+  if (!openedForWrite || !impl || !impl->file.isOpen()) return;
+  bool needNotify = false;
+  {
+    HalStorage::StorageLock lock;
+    if (impl->file.close()) {
+      openedForWrite = false;
+      needNotify = true;
+    }
+  }  // lock released before notifying, matching HalFile::close()
+  if (needNotify) HalStorage::getInstance().notifySdFreeUpdate();
 }
 
 HalFile::~HalFile() { release(); }
