@@ -17,6 +17,7 @@ struct SystemStatus {
   uint32_t cpuFreqMHz;
   std::string ip;
   std::string wifiMode;  // "STA", "AP", or "Off"
+  std::string ssid;      // network name in STA mode; empty otherwise
   int rssi;              // dBm; 0 when not in STA mode
   std::string macAddress;
   uint32_t freeHeapBytes;
@@ -62,6 +63,7 @@ struct SystemStatus {
       s.rssi = 0;
     } else if (WiFi.status() == WL_CONNECTED) {
       s.wifiMode = "STA";
+      s.ssid = WiFi.SSID().c_str();
       s.ip = WiFi.localIP().toString().c_str();
       s.rssi = WiFi.RSSI();
     } else {

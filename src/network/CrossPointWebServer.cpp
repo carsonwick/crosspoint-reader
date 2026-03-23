@@ -394,6 +394,7 @@ void CrossPointWebServer::handleStatus() const {
   doc["cpuMHz"] = status.cpuFreqMHz;
   doc["ip"] = status.ip;
   doc["mode"] = status.wifiMode;
+  doc["ssid"] = status.ssid;
   doc["rssi"] = status.rssi;
   doc["macAddress"] = status.macAddress;
   doc["freeHeap"] = status.freeHeapBytes;

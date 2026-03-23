@@ -123,7 +123,7 @@
   </div>
 
   <div class="card">
-    <h2>Device Status</h2>
+    <h2>Device</h2>
     <div class="info-row">
       <span class="label">Version</span>
       <span class="value" id="version">Loading...</span>
@@ -137,8 +137,24 @@
       <span class="value" id="cpu-mhz">Loading...</span>
     </div>
     <div class="info-row">
-      <span class="label">WiFi Status</span>
+      <span class="label">Uptime</span>
+      <span class="value" id="uptime">Loading...</span>
+    </div>
+    <div class="info-row">
+      <span class="label">Battery</span>
+      <span class="value" id="battery">Loading...</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Network</h2>
+    <div class="info-row">
+      <span class="label">WiFi</span>
       <span class="status" id="wifi-status">Loading...</span>
+    </div>
+    <div class="info-row" id="row-ssid" style="display:none">
+      <span class="label">SSID</span>
+      <span class="value" id="ssid">—</span>
     </div>
     <div class="info-row">
       <span class="label">IP Address</span>
@@ -148,8 +164,16 @@
       <span class="label">MAC Address</span>
       <span class="value" id="mac-address">Loading...</span>
     </div>
+    <div class="info-row" id="row-rssi" style="display:none">
+      <span class="label">Signal</span>
+      <span class="value" id="rssi">—</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Memory</h2>
     <div class="info-row">
-      <span class="label">Free Memory</span>
+      <span class="label">Free RAM</span>
       <span class="value" id="free-heap">Loading...</span>
     </div>
     <div class="info-row">
@@ -160,17 +184,13 @@
       <span class="label">Max Block</span>
       <span class="value" id="max-alloc-heap">Loading...</span>
     </div>
+  </div>
+
+  <div class="card">
+    <h2>Storage</h2>
     <div class="info-row">
       <span class="label">Flash</span>
       <span class="value" id="flash-used">Loading...</span>
-    </div>
-    <div class="info-row">
-      <span class="label">Battery</span>
-      <span class="value" id="battery">Loading...</span>
-    </div>
-    <div class="info-row">
-      <span class="label">Uptime</span>
-      <span class="value" id="uptime">Loading...</span>
     </div>
     <div class="info-row">
       <span class="label">SD Card</span>
@@ -200,33 +220,49 @@
       return h + 'h ' + String(m).padStart(2, '0') + 'm ' + String(s).padStart(2, '0') + 's';
     }
 
+    function rssiQuality(dBm) {
+      if (dBm >= -50) return 'Excellent';
+      if (dBm >= -60) return 'Good';
+      if (dBm >= -70) return 'Fair';
+      return 'Weak';
+    }
+
     function applyStatus(data, includeSd) {
+      // Device
       document.getElementById('version').textContent = data.version || 'N/A';
       document.getElementById('chip-version').textContent = data.chipVersion || 'N/A';
       document.getElementById('cpu-mhz').textContent = data.cpuMHz
         ? data.cpuMHz.toLocaleString() + ' MHz'
         : 'N/A';
-      const wifiStatus = document.getElementById('wifi-status');
-      const wifiLabels = { STA: 'Station', AP: 'Access Point', Off: 'Off' };
-      wifiStatus.textContent = wifiLabels[data.mode] || data.mode || 'N/A';
-      document.getElementById('ip-address').textContent = data.ip || 'N/A';
-      document.getElementById('mac-address').textContent = data.macAddress || 'N/A';
-      document.getElementById('free-heap').textContent = data.freeHeap
-        ? formatBytes(data.freeHeap)
-        : 'N/A';
-      document.getElementById('min-free-heap').textContent = data.minFreeHeap
-        ? formatBytes(data.minFreeHeap)
-        : 'N/A';
-      document.getElementById('max-alloc-heap').textContent = data.maxAllocHeap
-        ? formatBytes(data.maxAllocHeap)
-        : 'N/A';
-      document.getElementById('flash-used').textContent = data.flashTotal
-        ? formatBytes(data.flashTotal)
-        : 'N/A';
+      document.getElementById('uptime').textContent = formatUptime(data.uptime);
       document.getElementById('battery').textContent = (data.batteryPercent != null)
         ? (data.batteryPercent + '%' + (data.charging ? ' (Charging)' : ''))
         : 'N/A';
-      document.getElementById('uptime').textContent = formatUptime(data.uptime);
+
+      // Network
+      const wifiLabels = { STA: 'Station', AP: 'Access Point', Off: 'Off' };
+      document.getElementById('wifi-status').textContent = wifiLabels[data.mode] || data.mode || 'N/A';
+      document.getElementById('ip-address').textContent = data.ip || 'N/A';
+      document.getElementById('mac-address').textContent = data.macAddress || 'N/A';
+      const isSta = data.mode === 'STA';
+      document.getElementById('row-ssid').style.display = isSta ? '' : 'none';
+      document.getElementById('ssid').textContent = data.ssid || 'N/A';
+      document.getElementById('row-rssi').style.display = isSta ? '' : 'none';
+      document.getElementById('rssi').textContent = isSta && data.rssi
+        ? data.rssi + ' dBm (' + rssiQuality(data.rssi) + ')'
+        : 'N/A';
+
+      // Memory
+      document.getElementById('free-heap').textContent = data.freeHeap
+        ? formatBytes(data.freeHeap) : 'N/A';
+      document.getElementById('min-free-heap').textContent = data.minFreeHeap
+        ? formatBytes(data.minFreeHeap) : 'N/A';
+      document.getElementById('max-alloc-heap').textContent = data.maxAllocHeap
+        ? formatBytes(data.maxAllocHeap) : 'N/A';
+
+      // Storage
+      document.getElementById('flash-used').textContent = data.flashTotal
+        ? formatBytes(data.flashTotal) : 'N/A';
 
       if (includeSd) {
         document.getElementById('sd-space').textContent = data.sdTotal
