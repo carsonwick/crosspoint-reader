@@ -129,13 +129,9 @@ HalFile::HalFile(std::unique_ptr<Impl> impl) : impl(std::move(impl)) {}
 
 void HalFile::release() noexcept {
   if (openedForWrite && impl && impl->file.isOpen()) {
-    const size_t sz = impl->file.fileSize();
     impl->file.close();
     openedForWrite = false;
-    // Skip notify for tiny writes (<1 KiB): a 6-byte progress.bin overwrite does
-    // not change FAT cluster allocation, so free space is unchanged. This prevents
-    // a FAT walk after every page turn.
-    if (sz >= 1024) HalStorage::getInstance().notifySdFreeUpdate();
+    HalStorage::getInstance().notifySdFreeUpdate();
   }
 }
 
@@ -210,23 +206,23 @@ bool HalStorage::openFileForRead(const char* moduleName, const String& path, Hal
   return openFileForRead(moduleName, path.c_str(), file);
 }
 
-bool HalStorage::openFileForWrite(const char* moduleName, const char* path, HalFile& file) {
+bool HalStorage::openFileForWrite(const char* moduleName, const char* path, HalFile& file, bool silent) {
   StorageLock lock;  // ensure thread safety for the duration of this function
   FsFile fsFile;
   bool ok = SDCard.openFileForWrite(moduleName, path, fsFile);
   if (ok) {
     file = HalFile(std::make_unique<HalFile::Impl>(std::move(fsFile)));
-    file.openedForWrite = true;
+    if (!silent) file.openedForWrite = true;
   }
   return ok;
 }
 
-bool HalStorage::openFileForWrite(const char* moduleName, const std::string& path, HalFile& file) {
-  return openFileForWrite(moduleName, path.c_str(), file);
+bool HalStorage::openFileForWrite(const char* moduleName, const std::string& path, HalFile& file, bool silent) {
+  return openFileForWrite(moduleName, path.c_str(), file, silent);
 }
 
-bool HalStorage::openFileForWrite(const char* moduleName, const String& path, HalFile& file) {
-  return openFileForWrite(moduleName, path.c_str(), file);
+bool HalStorage::openFileForWrite(const char* moduleName, const String& path, HalFile& file, bool silent) {
+  return openFileForWrite(moduleName, path.c_str(), file, silent);
 }
 
 bool HalStorage::removeDir(const char* path) {
@@ -272,11 +268,10 @@ void HalFile::rewindDirectory() { HAL_FILE_WRAPPED_CALL(rewindDirectory, ); }
 bool HalFile::close() {
   HalStorage::StorageLock lock;
   assert(impl != nullptr);
-  const size_t sz = openedForWrite ? impl->file.fileSize() : 0;  // read before close clears descriptor
   const bool ok = impl->file.close();
   if (ok && openedForWrite) {
     openedForWrite = false;  // clear before notify to prevent double-notify on double-close
-    if (sz >= 1024) HalStorage::getInstance().notifySdFreeUpdate();
+    HalStorage::getInstance().notifySdFreeUpdate();
   }
   return ok;
 }

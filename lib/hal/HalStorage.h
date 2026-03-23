@@ -41,9 +41,11 @@ class HalStorage {
   bool openFileForRead(const char* moduleName, const char* path, HalFile& file);
   bool openFileForRead(const char* moduleName, const std::string& path, HalFile& file);
   bool openFileForRead(const char* moduleName, const String& path, HalFile& file);
-  bool openFileForWrite(const char* moduleName, const char* path, HalFile& file);
-  bool openFileForWrite(const char* moduleName, const std::string& path, HalFile& file);
-  bool openFileForWrite(const char* moduleName, const String& path, HalFile& file);
+  // silent=true skips the free-space cache notification on close (use for frequent
+  // small writes like progress saves that do not meaningfully change free space).
+  bool openFileForWrite(const char* moduleName, const char* path, HalFile& file, bool silent = false);
+  bool openFileForWrite(const char* moduleName, const std::string& path, HalFile& file, bool silent = false);
+  bool openFileForWrite(const char* moduleName, const String& path, HalFile& file, bool silent = false);
   bool removeDir(const char* path);
 
   // Returns total SD card size in bytes (cached — fast, no SD access).
