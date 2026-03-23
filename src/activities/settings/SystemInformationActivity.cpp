@@ -25,7 +25,6 @@ static std::string formatBytes(uint64_t bytes) {
 void SystemInformationActivity::onEnter() {
   Activity::onEnter();
   status_.reset();
-  sdStatusReady_ = false;
   requestUpdate();
 }
 
@@ -36,17 +35,8 @@ void SystemInformationActivity::loop() {
     finish();
     return;
   }
-  // Collect fast fields first so this page appears immediately.
   if (!status_.has_value()) {
-    status_ = SystemStatus::collectFast();
-    requestUpdate();
-    return;
-  }
-
-  // SD stats can be slower to compute on large cards.
-  if (!sdStatusReady_) {
-    SystemStatus::fillSdStatus(*status_);
-    sdStatusReady_ = true;
+    status_ = SystemStatus::collect();
     requestUpdate();
   }
 }
@@ -106,9 +96,7 @@ void SystemInformationActivity::render(RenderLock&&) {
   snprintf(uptimeBuf, sizeof(uptimeBuf), "%uh %02um %02us", h, m, s);
   drawRow(8, tr(STR_UPTIME), uptimeBuf);
 
-  if (!sdStatusReady_) {
-    drawRow(9, tr(STR_SD_CARD), tr(STR_READING));
-  } else if (status.sdTotalBytes > 0) {
+  if (status.sdTotalBytes > 0) {
     drawRow(9, tr(STR_SD_CARD), formatBytes(status.sdUsedBytes) + " / " + formatBytes(status.sdTotalBytes));
   } else {
     drawRow(9, tr(STR_SD_CARD), tr(STR_NO_SD_CARD));

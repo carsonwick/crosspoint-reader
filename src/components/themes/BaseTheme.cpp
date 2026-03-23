@@ -22,7 +22,7 @@ constexpr int homeMarginTop = 30;
 constexpr int subtitleY = 738;
 
 // Format as "112.5MiB/59.4GiB" (used/total) using binary units (1024-based), matching formatBytes().
-void formatSdInfo(uint64_t freeBytes, uint64_t totalBytes, char* buf, size_t len) {
+static void formatSdInfo(uint64_t freeBytes, uint64_t totalBytes, char* buf, size_t len) {
   if (freeBytes > totalBytes) freeBytes = totalBytes;
   const uint64_t usedBytes = totalBytes - freeBytes;
   constexpr uint64_t GiB = 1024ULL * 1024 * 1024;
@@ -40,7 +40,7 @@ void formatSdInfo(uint64_t freeBytes, uint64_t totalBytes, char* buf, size_t len
 }
 
 // Draw a simple bold 10×12 microSD card icon: solid body with top-left diagonal notch.
-void drawMicroSdIcon(const GfxRenderer& renderer, int x, int y) {
+static void drawMicroSdIcon(const GfxRenderer& renderer, int x, int y) {
   renderer.fillRect(x + 2, y, 8, 1);      // row 0: notch removes left 2px
   renderer.fillRect(x + 1, y + 1, 9, 1);  // row 1: notch removes left 1px
   renderer.fillRect(x, y + 2, 10, 10);    // rows 2-11: full-width body
