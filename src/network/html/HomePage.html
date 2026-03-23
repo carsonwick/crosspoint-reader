@@ -161,7 +161,7 @@
       <span class="value" id="max-alloc-heap">Loading...</span>
     </div>
     <div class="info-row">
-      <span class="label">Flash Used</span>
+      <span class="label">Flash</span>
       <span class="value" id="flash-used">Loading...</span>
     </div>
     <div class="info-row">
@@ -207,7 +207,8 @@
         ? data.cpuMHz.toLocaleString() + ' MHz'
         : 'N/A';
       const wifiStatus = document.getElementById('wifi-status');
-      wifiStatus.textContent = data.mode || 'N/A';
+      const wifiLabels = { STA: 'Station', AP: 'Access Point', Off: 'Off' };
+      wifiStatus.textContent = wifiLabels[data.mode] || data.mode || 'N/A';
       document.getElementById('ip-address').textContent = data.ip || 'N/A';
       document.getElementById('mac-address').textContent = data.macAddress || 'N/A';
       document.getElementById('free-heap').textContent = data.freeHeap
@@ -219,8 +220,8 @@
       document.getElementById('max-alloc-heap').textContent = data.maxAllocHeap
         ? formatBytes(data.maxAllocHeap)
         : 'N/A';
-      document.getElementById('flash-used').textContent = data.flashAppUsed
-        ? (formatBytes(data.flashAppUsed) + ' / ' + formatBytes((data.flashAppUsed || 0) + (data.flashAppFree || 0)))
+      document.getElementById('flash-used').textContent = data.flashTotal
+        ? formatBytes(data.flashTotal)
         : 'N/A';
       document.getElementById('battery').textContent = (data.batteryPercent != null)
         ? (data.batteryPercent + '%' + (data.charging ? ' (Charging)' : ''))
