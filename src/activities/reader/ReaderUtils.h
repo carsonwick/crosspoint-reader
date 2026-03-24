@@ -38,14 +38,19 @@ inline PageTurnResult detectPageTurn(const MappedInputManager& input) {
   const bool usePress = !SETTINGS.longPressChapterSkip;
   const bool prev = usePress ? (input.wasPressed(MappedInputManager::Button::PageBack) ||
                                 input.wasPressed(MappedInputManager::Button::Left))
-                             : (input.wasReleased(MappedInputManager::Button::PageBack) ||
-                                input.wasReleased(MappedInputManager::Button::Left));
+                             : ((input.wasReleased(MappedInputManager::Button::PageBack) &&
+                                 !input.isLongPressHandled(MappedInputManager::Button::PageBack)) ||
+                                (input.wasReleased(MappedInputManager::Button::Left) &&
+                                 !input.isLongPressHandled(MappedInputManager::Button::Left)));
   const bool powerTurn = SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::PAGE_TURN &&
                          input.wasReleased(MappedInputManager::Button::Power);
   const bool next = usePress ? (input.wasPressed(MappedInputManager::Button::PageForward) || powerTurn ||
                                 input.wasPressed(MappedInputManager::Button::Right))
-                             : (input.wasReleased(MappedInputManager::Button::PageForward) || powerTurn ||
-                                input.wasReleased(MappedInputManager::Button::Right));
+                             : ((input.wasReleased(MappedInputManager::Button::PageForward) &&
+                                 !input.isLongPressHandled(MappedInputManager::Button::PageForward)) ||
+                                powerTurn ||
+                                (input.wasReleased(MappedInputManager::Button::Right) &&
+                                 !input.isLongPressHandled(MappedInputManager::Button::Right)));
   return {prev, next};
 }
 

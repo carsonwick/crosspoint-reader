@@ -80,19 +80,43 @@ void XtcReaderActivity::loop() {
     return;
   }
 
+  // Long press page turn: skip 10 pages (fires at threshold, not on release)
+  if (SETTINGS.longPressChapterSkip) {
+    const bool skipFwd = mappedInput.wasLongPressed(MappedInputManager::Button::PageForward, skipPageMs);
+    const bool skipBack = mappedInput.wasLongPressed(MappedInputManager::Button::PageBack, skipPageMs);
+    if (skipFwd || skipBack) {
+      if (skipFwd) {
+        currentPage += 10;
+        if (currentPage >= xtc->getPageCount()) {
+          currentPage = xtc->getPageCount();  // Allow showing "End of book"
+        }
+      } else {
+        currentPage -= (currentPage >= 10) ? 10 : currentPage;
+      }
+      requestUpdate();
+      return;
+    }
+  }
+
   // When long-press chapter skip is disabled, turn pages on press instead of release.
   const bool usePressForPageTurn = !SETTINGS.longPressChapterSkip;
-  const bool prevTriggered = usePressForPageTurn ? (mappedInput.wasPressed(MappedInputManager::Button::PageBack) ||
-                                                    mappedInput.wasPressed(MappedInputManager::Button::Left))
-                                                 : (mappedInput.wasReleased(MappedInputManager::Button::PageBack) ||
-                                                    mappedInput.wasReleased(MappedInputManager::Button::Left));
+  const bool prevTriggered = usePressForPageTurn
+                                 ? (mappedInput.wasPressed(MappedInputManager::Button::PageBack) ||
+                                    mappedInput.wasPressed(MappedInputManager::Button::Left))
+                                 : ((mappedInput.wasReleased(MappedInputManager::Button::PageBack) &&
+                                     !mappedInput.isLongPressHandled(MappedInputManager::Button::PageBack)) ||
+                                    (mappedInput.wasReleased(MappedInputManager::Button::Left) &&
+                                     !mappedInput.isLongPressHandled(MappedInputManager::Button::Left)));
   const bool powerPageTurn = SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::PAGE_TURN &&
                              mappedInput.wasReleased(MappedInputManager::Button::Power);
   const bool nextTriggered = usePressForPageTurn
                                  ? (mappedInput.wasPressed(MappedInputManager::Button::PageForward) || powerPageTurn ||
                                     mappedInput.wasPressed(MappedInputManager::Button::Right))
-                                 : (mappedInput.wasReleased(MappedInputManager::Button::PageForward) || powerPageTurn ||
-                                    mappedInput.wasReleased(MappedInputManager::Button::Right));
+                                 : ((mappedInput.wasReleased(MappedInputManager::Button::PageForward) &&
+                                     !mappedInput.isLongPressHandled(MappedInputManager::Button::PageForward)) ||
+                                    powerPageTurn ||
+                                    (mappedInput.wasReleased(MappedInputManager::Button::Right) &&
+                                     !mappedInput.isLongPressHandled(MappedInputManager::Button::Right)));
 
   if (!prevTriggered && !nextTriggered) {
     return;
@@ -105,18 +129,13 @@ void XtcReaderActivity::loop() {
     return;
   }
 
-  const bool skipPages = SETTINGS.longPressChapterSkip && mappedInput.getHeldTime() > skipPageMs;
-  const int skipAmount = skipPages ? 10 : 1;
-
   if (prevTriggered) {
-    if (currentPage >= static_cast<uint32_t>(skipAmount)) {
-      currentPage -= skipAmount;
-    } else {
-      currentPage = 0;
+    if (currentPage >= 1) {
+      currentPage--;
     }
     requestUpdate();
   } else if (nextTriggered) {
-    currentPage += skipAmount;
+    currentPage++;
     if (currentPage >= xtc->getPageCount()) {
       currentPage = xtc->getPageCount();  // Allow showing "End of book"
     }

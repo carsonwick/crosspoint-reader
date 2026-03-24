@@ -163,13 +163,12 @@ void FileBrowserActivity::loop() {
   const int pathReserved = renderer.getLineHeight(SMALL_FONT_ID) + UITheme::getInstance().getMetrics().verticalSpacing;
   const int pageItems = UITheme::getNumberOfItemsPerPage(renderer, true, false, true, false, pathReserved);
 
-  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
-    if (files.empty()) return;
-
+  // Long press CONFIRM: delete file (fires at threshold, not on release)
+  if (!files.empty()) {
     const std::string& entry = files[selectorIndex].name;
-    bool isDirectory = (entry.back() == '/');
+    const bool isDirectory = (entry.back() == '/');
 
-    if (mappedInput.getHeldTime() >= GO_HOME_MS && !isDirectory) {
+    if (!isDirectory && mappedInput.wasLongPressed(MappedInputManager::Button::Confirm, GO_HOME_MS)) {
       // --- LONG PRESS ACTION: DELETE FILE ---
       std::string cleanBasePath = basepath;
       if (cleanBasePath.back() != '/') cleanBasePath += "/";
@@ -202,18 +201,27 @@ void FileBrowserActivity::loop() {
 
       startActivityForResult(std::make_unique<ConfirmationActivity>(renderer, mappedInput, heading, entry), handler);
       return;
-    } else {
-      // --- SHORT PRESS ACTION: OPEN/NAVIGATE ---
-      if (basepath.back() != '/') basepath += "/";
+    }
+  }
 
-      if (isDirectory) {
-        basepath += entry.substr(0, entry.length() - 1);
-        loadFiles();
-        selectorIndex = 0;
-        requestUpdate();
-      } else {
-        onSelectBook(basepath + entry);
-      }
+  // Short press CONFIRM: open/navigate (suppressed if long press was already handled)
+  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) &&
+      !mappedInput.isLongPressHandled(MappedInputManager::Button::Confirm)) {
+    if (files.empty()) return;
+
+    const std::string& entry = files[selectorIndex].name;
+    const bool isDirectory = (entry.back() == '/');
+
+    // --- SHORT PRESS ACTION: OPEN/NAVIGATE ---
+    if (basepath.back() != '/') basepath += "/";
+
+    if (isDirectory) {
+      basepath += entry.substr(0, entry.length() - 1);
+      loadFiles();
+      selectorIndex = 0;
+      requestUpdate();
+    } else {
+      onSelectBook(basepath + entry);
     }
     return;
   }

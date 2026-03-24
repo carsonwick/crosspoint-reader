@@ -54,6 +54,20 @@ bool MappedInputManager::mapButton(const Button button, bool (HalGPIO::*fn)(uint
   return false;
 }
 
+void MappedInputManager::update() const {
+  // Deferred reset: clear the long-press flag one frame after the button was released.
+  // This keeps isLongPressHandled() true during the release frame so the release event
+  // is suppressed, then clears it so the next press starts fresh.
+  if (pendingLongPressReset_) {
+    longPressFired_ = false;
+    pendingLongPressReset_ = false;
+  }
+  gpio.update();
+  if (gpio.wasAnyReleased()) {
+    pendingLongPressReset_ = true;
+  }
+}
+
 bool MappedInputManager::wasPressed(const Button button) const { return mapButton(button, &HalGPIO::wasPressed); }
 
 bool MappedInputManager::wasReleased(const Button button) const { return mapButton(button, &HalGPIO::wasReleased); }
@@ -65,6 +79,19 @@ bool MappedInputManager::wasAnyPressed() const { return gpio.wasAnyPressed(); }
 bool MappedInputManager::wasAnyReleased() const { return gpio.wasAnyReleased(); }
 
 unsigned long MappedInputManager::getHeldTime() const { return gpio.getHeldTime(); }
+
+bool MappedInputManager::wasLongPressed(const Button button, const unsigned long thresholdMs) const {
+  if (longPressFired_) return false;
+  if (!isPressed(button)) return false;
+  if (getHeldTime() < thresholdMs) return false;
+  longPressFired_ = true;
+  longPressButton_ = static_cast<uint8_t>(button);
+  return true;
+}
+
+bool MappedInputManager::isLongPressHandled(const Button button) const {
+  return longPressFired_ && longPressButton_ == static_cast<uint8_t>(button);
+}
 
 MappedInputManager::Labels MappedInputManager::mapLabels(const char* back, const char* confirm, const char* previous,
                                                          const char* next) const {
