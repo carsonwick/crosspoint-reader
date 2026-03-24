@@ -619,14 +619,28 @@ void EpubReaderActivity::render(RenderLock&& lock) {
   {
     auto p = section->loadPageFromSectionFile();
     if (!p) {
-      LOG_ERR("ERS", "Failed to load page from SD - clearing section cache");
-      section->clearCache();
-      section.reset();
-      requestUpdate();  // Try again after clearing cache
-                        // TODO: prevent infinite loop if the page keeps failing to load for some reason
+      pageLoadFailCount++;
+      LOG_ERR("ERS", "Failed to load page from SD (attempt %d/%d)", pageLoadFailCount, MAX_PAGE_LOAD_RETRIES);
+      nextPageNumber = section->currentPage;  // preserve page so retry reopens same page
+      if (pageLoadFailCount < MAX_PAGE_LOAD_RETRIES) {
+        currentPageFootnotes.clear();
+        section->clearCache();
+        section.reset();
+        requestUpdate();
+      } else {
+        LOG_ERR("ERS", "Page load failed %d times - giving up", pageLoadFailCount);
+        renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_PAGE_LOAD_ERROR), true, EpdFontFamily::BOLD);
+        renderStatusBar();  // section still valid here
+        renderer.displayBuffer();
+        pageLoadFailCount = 0;
+        currentPageFootnotes.clear();
+        section->clearCache();
+        section.reset();
+      }
       automaticPageTurnActive = false;
       return;
     }
+    pageLoadFailCount = 0;
 
     // Collect footnotes from the loaded page
     currentPageFootnotes = std::move(p->footnotes);
@@ -732,8 +746,8 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
       renderer.displayBuffer(HalDisplay::FAST_REFRESH);
 
       // Re-render page content to restore images into the blanked area
-      // Status bar is not re-rendered here to avoid reading stale dynamic values (e.g. battery %)
       page->render(renderer, SETTINGS.getReaderFontId(), orientedMarginLeft, orientedMarginTop);
+      renderStatusBar();
       renderer.displayBuffer(HalDisplay::FAST_REFRESH);
     } else {
       renderer.displayBuffer(HalDisplay::HALF_REFRESH);
