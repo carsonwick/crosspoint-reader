@@ -271,11 +271,11 @@ void FileBrowserActivity::loop() {
 
 std::string getFileName(const std::string& filename) {
   if (filename.back() == '/') {
-    filename.pop_back();
+    const std::string name = filename.substr(0, filename.size() - 1);
     if (!UITheme::getInstance().getTheme().showsFileIcons()) {
-      return "[" + filename + "]";
+      return "[" + name + "]";
     }
-    return filename;
+    return name;
   }
   const auto pos = filename.rfind('.');
   return filename.substr(0, pos);
