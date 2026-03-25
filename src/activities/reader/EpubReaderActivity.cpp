@@ -627,7 +627,6 @@ void EpubReaderActivity::render(RenderLock&& lock) {
       section->clearCache();
       section.reset();
       renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_PAGE_LOAD_ERROR), true, EpdFontFamily::BOLD);
-      renderStatusBar();
       renderer.displayBuffer();
       automaticPageTurnActive = false;
       return;
