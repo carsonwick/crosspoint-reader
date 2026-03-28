@@ -200,7 +200,7 @@ void EpubReaderActivity::loop() {
   // Double press page button: skip 10 pages.
   // In release mode the release of the second press is suppressed by isDoublePressHandled()
   // inside detectPageTurn, so no phantom page turn fires after the skip.
-  if (SETTINGS.doublePressChapterSkip) {
+  if (SETTINGS.doublePressPageSkip) {
     const bool skipFwd = mappedInput.wasDoublePressed(MappedInputManager::Button::PageForward, doubleClickWindowMs) ||
                          mappedInput.wasDoublePressed(MappedInputManager::Button::Right, doubleClickWindowMs);
     const bool skipBack = mappedInput.wasDoublePressed(MappedInputManager::Button::PageBack, doubleClickWindowMs) ||
@@ -240,7 +240,7 @@ void EpubReaderActivity::loop() {
   // waiting for a possible second press. If the window expires without one, fire the deferred turn.
   // Guard with !isPressed so a long hold does not fire the deferred turn while the button is still
   // held (the long press handler will fire instead once the threshold is reached).
-  if (!prevTriggered && !nextTriggered && SETTINGS.doublePressChapterSkip) {
+  if (!prevTriggered && !nextTriggered && SETTINGS.doublePressPageSkip) {
     if (!mappedInput.isPressed(MappedInputManager::Button::PageBack) &&
         !mappedInput.isPressed(MappedInputManager::Button::Left))
       prevTriggered = mappedInput.wasDoublePressExpired(MappedInputManager::Button::PageBack) ||
@@ -678,15 +678,11 @@ void EpubReaderActivity::render(RenderLock&& lock) {
   {
     auto p = section->loadPageFromSectionFile();
     if (!p) {
-      // The section cache is corrupt or unreadable. Retrying would re-read
-      // the same bad file, so clear it immediately and show an error.
-      // The user can navigate away and back to trigger a fresh render.
       LOG_ERR("ERS", "Failed to load page from SD - clearing section cache");
-      currentPageFootnotes.clear();
       section->clearCache();
       section.reset();
-      renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_PAGE_LOAD_ERROR), true, EpdFontFamily::BOLD);
-      renderer.displayBuffer();
+      requestUpdate();  // Try again after clearing cache
+                        // TODO: prevent infinite loop if the page keeps failing to load for some reason
       automaticPageTurnActive = false;
       return;
     }
@@ -741,7 +737,7 @@ void EpubReaderActivity::silentIndexNextChapterIfNeeded(const uint16_t viewportW
 
 void EpubReaderActivity::saveProgress(int spineIndex, int currentPage, int pageCount) {
   FsFile f;
-  if (Storage.openFileForWrite("ERS", epub->getCachePath() + "/progress.bin", f, /*silent=*/true)) {
+  if (Storage.openFileForWrite("ERS", epub->getCachePath() + "/progress.bin", f)) {
     uint8_t data[6];
     data[0] = currentSpineIndex & 0xFF;
     data[1] = (currentSpineIndex >> 8) & 0xFF;
@@ -795,8 +791,8 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
       renderer.displayBuffer(HalDisplay::FAST_REFRESH);
 
       // Re-render page content to restore images into the blanked area
+      // Status bar is not re-rendered here to avoid reading stale dynamic values (e.g. battery %)
       page->render(renderer, SETTINGS.getReaderFontId(), orientedMarginLeft, orientedMarginTop);
-      renderStatusBar();
       renderer.displayBuffer(HalDisplay::FAST_REFRESH);
     } else {
       renderer.displayBuffer(HalDisplay::HALF_REFRESH);
