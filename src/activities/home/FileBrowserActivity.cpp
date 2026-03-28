@@ -151,25 +151,28 @@ void FileBrowserActivity::clearFileMetadata(const std::string& fullPath) {
 }
 
 void FileBrowserActivity::loop() {
-  // Long press BACK (1s+) goes to root folder
-  if (mappedInput.isPressed(MappedInputManager::Button::Back) && mappedInput.getHeldTime() >= GO_HOME_MS &&
-      basepath != "/") {
-    basepath = "/";
-    loadFiles();
-    selectorIndex = 0;
+  // Long press BACK (1s+) goes to SD root folder.
+  if (mappedInput.wasLongPressed(MappedInputManager::Button::Back, GO_HOME_MS)) {
+    if (basepath != "/") {
+      basepath = "/";
+      loadFiles();
+      selectorIndex = 0;
+      requestUpdate();
+    }
     return;
   }
 
   const int pathReserved = renderer.getLineHeight(SMALL_FONT_ID) + UITheme::getInstance().getMetrics().verticalSpacing;
   const int pageItems = UITheme::getNumberOfItemsPerPage(renderer, true, false, true, false, pathReserved);
 
-  // Long press CONFIRM: delete file (fires at threshold, not on release)
-  if (!files.empty()) {
+  // Long press CONFIRM: delete file.
+  // wasLongPressed is called unconditionally so longPressFired_ is always set on a long hold,
+  // preventing the release from falling through to the short-press "open" handler below.
+  if (!files.empty() && mappedInput.wasLongPressed(MappedInputManager::Button::Confirm, GO_HOME_MS)) {
     const std::string& entry = files[selectorIndex].name;
     const bool isDirectory = (entry.back() == '/');
 
-    if (!isDirectory && mappedInput.wasLongPressed(MappedInputManager::Button::Confirm, GO_HOME_MS)) {
-      // --- LONG PRESS ACTION: DELETE FILE ---
+    if (!isDirectory) {
       std::string cleanBasePath = basepath;
       if (cleanBasePath.back() != '/') cleanBasePath += "/";
       const std::string fullPath = cleanBasePath + entry;
@@ -202,6 +205,8 @@ void FileBrowserActivity::loop() {
       startActivityForResult(std::make_unique<ConfirmationActivity>(renderer, mappedInput, heading, entry), handler);
       return;
     }
+    // Long press on a directory: no action, but consumed so the release does not enter the folder.
+    return;
   }
 
   // Short press CONFIRM: open/navigate (suppressed if long press was already handled)
@@ -226,24 +231,23 @@ void FileBrowserActivity::loop() {
     return;
   }
 
-  if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
+  if (mappedInput.wasReleased(MappedInputManager::Button::Back) &&
+      !mappedInput.isLongPressHandled(MappedInputManager::Button::Back)) {
     // Short press: go up one directory, or go home if at root
-    if (mappedInput.getHeldTime() < GO_HOME_MS) {
-      if (basepath != "/") {
-        const std::string oldPath = basepath;
+    if (basepath != "/") {
+      const std::string oldPath = basepath;
 
-        basepath.replace(basepath.find_last_of('/'), std::string::npos, "");
-        if (basepath.empty()) basepath = "/";
-        loadFiles();
+      basepath.replace(basepath.find_last_of('/'), std::string::npos, "");
+      if (basepath.empty()) basepath = "/";
+      loadFiles();
 
-        const auto pos = oldPath.find_last_of('/');
-        const std::string dirName = oldPath.substr(pos + 1) + "/";
-        selectorIndex = findEntry(dirName);
+      const auto pos = oldPath.find_last_of('/');
+      const std::string dirName = oldPath.substr(pos + 1) + "/";
+      selectorIndex = findEntry(dirName);
 
-        requestUpdate();
-      } else {
-        onGoHome();
-      }
+      requestUpdate();
+    } else {
+      onGoHome();
     }
   }
 
