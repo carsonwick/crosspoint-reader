@@ -116,7 +116,7 @@ void XtcReaderActivity::loop() {
   }
 
   // Double press: skip 10 pages forward or backward.
-  if (SETTINGS.doublePressChapterSkip) {
+  if (SETTINGS.doublePressPageSkip) {
     const bool skipFwd = mappedInput.wasDoublePressed(MappedInputManager::Button::PageForward, doubleClickWindowMs) ||
                          mappedInput.wasDoublePressed(MappedInputManager::Button::Right, doubleClickWindowMs);
     const bool skipBack = mappedInput.wasDoublePressed(MappedInputManager::Button::PageBack, doubleClickWindowMs) ||
@@ -124,7 +124,7 @@ void XtcReaderActivity::loop() {
     if (skipFwd || skipBack) {
       if (skipFwd) {
         currentPage += kTenPageSkip;
-        if (currentPage >= xtc->getPageCount()) currentPage = xtc->getPageCount();
+        if (currentPage >= xtc->getPageCount()) currentPage = xtc->getPageCount() - 1;
       } else {
         currentPage -= (currentPage >= kTenPageSkip) ? kTenPageSkip : currentPage;
       }
@@ -136,7 +136,7 @@ void XtcReaderActivity::loop() {
   auto [prevTriggered, nextTriggered] = ReaderUtils::detectPageTurn(mappedInput);
 
   // Deferred page turn: fires after the double-press window expires when the button is released.
-  if (!prevTriggered && !nextTriggered && SETTINGS.doublePressChapterSkip) {
+  if (!prevTriggered && !nextTriggered && SETTINGS.doublePressPageSkip) {
     if (!mappedInput.isPressed(MappedInputManager::Button::PageBack) &&
         !mappedInput.isPressed(MappedInputManager::Button::Left))
       prevTriggered = mappedInput.wasDoublePressExpired(MappedInputManager::Button::PageBack) ||
@@ -163,7 +163,7 @@ void XtcReaderActivity::loop() {
     requestUpdate();
   } else {
     currentPage++;
-    if (currentPage >= xtc->getPageCount()) currentPage = xtc->getPageCount();
+    if (currentPage >= xtc->getPageCount()) currentPage = xtc->getPageCount() - 1;
     requestUpdate();
   }
 }
@@ -368,7 +368,7 @@ void XtcReaderActivity::renderPage() {
 
 void XtcReaderActivity::saveProgress() const {
   FsFile f;
-  if (Storage.openFileForWrite("XTR", xtc->getCachePath() + "/progress.bin", f, /*silent=*/true)) {
+  if (Storage.openFileForWrite("XTR", xtc->getCachePath() + "/progress.bin", f)) {
     uint8_t data[4];
     data[0] = currentPage & 0xFF;
     data[1] = (currentPage >> 8) & 0xFF;

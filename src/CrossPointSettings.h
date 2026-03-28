@@ -190,7 +190,7 @@ class CrossPointSettings {
   // Long-press chapter skip on side buttons
   uint8_t longPressChapterSkip = 1;
   // Double-press chapter skip on side buttons
-  uint8_t doublePressChapterSkip = 1;
+  uint8_t doublePressPageSkip = 1;
   // UI Theme
   uint8_t uiTheme = LYRA;
   // Sunlight fading compensation

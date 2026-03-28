@@ -200,7 +200,7 @@ void EpubReaderActivity::loop() {
   // Double press page button: skip 10 pages.
   // In release mode the release of the second press is suppressed by isDoublePressHandled()
   // inside detectPageTurn, so no phantom page turn fires after the skip.
-  if (SETTINGS.doublePressChapterSkip) {
+  if (SETTINGS.doublePressPageSkip) {
     const bool skipFwd = mappedInput.wasDoublePressed(MappedInputManager::Button::PageForward, doubleClickWindowMs) ||
                          mappedInput.wasDoublePressed(MappedInputManager::Button::Right, doubleClickWindowMs);
     const bool skipBack = mappedInput.wasDoublePressed(MappedInputManager::Button::PageBack, doubleClickWindowMs) ||
@@ -240,7 +240,7 @@ void EpubReaderActivity::loop() {
   // waiting for a possible second press. If the window expires without one, fire the deferred turn.
   // Guard with !isPressed so a long hold does not fire the deferred turn while the button is still
   // held (the long press handler will fire instead once the threshold is reached).
-  if (!prevTriggered && !nextTriggered && SETTINGS.doublePressChapterSkip) {
+  if (!prevTriggered && !nextTriggered && SETTINGS.doublePressPageSkip) {
     if (!mappedInput.isPressed(MappedInputManager::Button::PageBack) &&
         !mappedInput.isPressed(MappedInputManager::Button::Left))
       prevTriggered = mappedInput.wasDoublePressExpired(MappedInputManager::Button::PageBack) ||
@@ -741,7 +741,7 @@ void EpubReaderActivity::silentIndexNextChapterIfNeeded(const uint16_t viewportW
 
 void EpubReaderActivity::saveProgress(int spineIndex, int currentPage, int pageCount) {
   FsFile f;
-  if (Storage.openFileForWrite("ERS", epub->getCachePath() + "/progress.bin", f, /*silent=*/true)) {
+  if (Storage.openFileForWrite("ERS", epub->getCachePath() + "/progress.bin", f)) {
     uint8_t data[6];
     data[0] = currentSpineIndex & 0xFF;
     data[1] = (currentSpineIndex >> 8) & 0xFF;

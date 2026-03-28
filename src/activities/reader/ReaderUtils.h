@@ -37,13 +37,13 @@ struct PageTurnResult {
 inline PageTurnResult detectPageTurn(const MappedInputManager& input) {
   // All four navigation buttons defer to release when any chapter-skip gesture is enabled,
   // so an initial press is not immediately consumed before a long hold or double press can fire.
-  const bool useRelease = SETTINGS.longPressChapterSkip || SETTINGS.doublePressChapterSkip;
+  const bool useRelease = SETTINGS.longPressChapterSkip || SETTINGS.doublePressPageSkip;
 
   // Returns true when the button should count as a page-turn trigger this frame.
   auto navTurn = [&](MappedInputManager::Button btn) -> bool {
     if (useRelease) {
-      return input.wasReleased(btn) && !input.isLongPressHandled(btn) &&
-             !input.isDoublePressHandled(btn) && !input.isDoublePressArmed(btn);
+      return input.wasReleased(btn) && !input.isLongPressHandled(btn) && !input.isDoublePressHandled(btn) &&
+             !input.isDoublePressArmed(btn);
     }
     return input.wasPressed(btn);
   };

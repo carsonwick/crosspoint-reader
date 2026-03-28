@@ -65,7 +65,7 @@ void MappedInputManager::update() const {
     pendingLongPressReset_ = false;
   }
   gpio.update();
-  if (gpio.wasAnyReleased()) {
+  if (longPressFired_ && wasReleased(static_cast<Button>(longPressButton_))) {
     pendingLongPressReset_ = true;
   }
 
@@ -148,7 +148,7 @@ bool MappedInputManager::wasDoublePressed(const Button button, const unsigned lo
 
   // Block re-arming within one window duration of the last fired double press.
   // This prevents the first post-skip page-turn press from immediately starting
-  // a new double press interaction that could fire another chapter skip.
+  // a new double press interaction that could fire another page skip.
   if (doublePressLastFiredMs_ > 0 && (now - doublePressLastFiredMs_) <= windowMs) {
     return false;
   }
