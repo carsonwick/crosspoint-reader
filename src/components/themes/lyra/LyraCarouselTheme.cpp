@@ -136,9 +136,12 @@ void LyraCarouselTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect,
       const int nextIdx = (centerIdx + 1) % bookCount;
       drawCover(prevIdx, leftX, sideTileY, kSideCoverMaxW, kSideCoverMaxH);
       drawCover(nextIdx, rightX, sideTileY, kSideCoverMaxW, kSideCoverMaxH);
-      // Dither overlay makes side covers appear recessed behind the centre
-      renderer.fillRectDither(leftX, sideTileY, kSideCoverMaxW, kSideCoverMaxH, Color::DarkGray);
-      renderer.fillRectDither(rightX, sideTileY, kSideCoverMaxW, kSideCoverMaxH, Color::DarkGray);
+      // Horizontal stripe overlay — draws black every 3rd row (additive, never
+      // clears pixels) so the cover image shows through the gaps.
+      for (int row = sideTileY; row < sideTileY + kSideCoverMaxH; row += 3) {
+        renderer.fillRect(leftX, row, kSideCoverMaxW, 1, true);
+        renderer.fillRect(rightX, row, kSideCoverMaxW, 1, true);
+      }
     }
     // Clear centre area to white before drawing centre cover so the centre
     // cover always occludes any black pixels painted by the side covers.
