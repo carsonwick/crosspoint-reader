@@ -67,7 +67,11 @@ void LyraCarouselTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect,
   }
 
   const int bookCount = static_cast<int>(recentBooks.size());
-  const int centerIdx = (selectorIndex < bookCount) ? selectorIndex : 0;
+  // When navigating the icon row, keep showing the last carousel position —
+  // falling back to 0 on first use (lastCarouselSelectorIndex == -1).
+  const bool inCarouselRow = (selectorIndex < bookCount);
+  const int centerIdx =
+      inCarouselRow ? selectorIndex : (lastCarouselSelectorIndex >= 0 ? lastCarouselSelectorIndex : 0);
 
   if (centerIdx != lastCarouselSelectorIndex) {
     coverRendered = false;
