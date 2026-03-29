@@ -42,10 +42,12 @@ constexpr ThemeMetrics values = {.batteryWidth = 16,
 
 class LyraCarouselTheme : public LyraTheme {
  public:
+  static void setPreRenderIndex(int idx);
   void drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std::vector<RecentBook>& recentBooks,
                            const int selectorIndex, bool& coverRendered, bool& coverBufferStored, bool& bufferRestored,
                            std::function<bool()> storeCoverBuffer) const override;
   void drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount, int selectedIndex,
                       const std::function<std::string(int index)>& buttonLabel,
                       const std::function<UIIcon(int index)>& rowIcon) const override;
+  void drawCarouselBorder(GfxRenderer& renderer, Rect coverRect, bool inCarouselRow) const override;
 };
