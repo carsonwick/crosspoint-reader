@@ -20,8 +20,8 @@ namespace {
 // Cover layout — centre cover dominates, sides slide kOverlap px behind it
 constexpr int kCenterCoverMaxW = 340;
 constexpr int kCenterCoverMaxH = LyraCarouselMetrics::values.homeCoverHeight;
-constexpr int kSideCoverMaxW = 280;
-constexpr int kSideCoverMaxH = LyraCarouselMetrics::values.homeCoverHeight - 40;
+constexpr int kSideCoverMaxW = 200;
+constexpr int kSideCoverMaxH = LyraCarouselMetrics::values.homeCoverHeight - 210;
 constexpr int kOverlap = 60;   // px each side cover hides behind centre
 constexpr int kCoverTopPad = 10;
 
