@@ -61,6 +61,21 @@ const uint8_t* iconBitmapFor(UIIcon icon) {
 }  // namespace
 
 // ---------------------------------------------------------------------------
+// Static helpers
+// ---------------------------------------------------------------------------
+void LyraCarouselTheme::setPreRenderIndex(int idx) { lastCarouselSelectorIndex = idx; }
+
+void LyraCarouselTheme::drawCarouselBorder(GfxRenderer& renderer, Rect coverRect, bool inCarouselRow) const {
+  if (!inCarouselRow) return;
+  const int screenW = renderer.getScreenWidth();
+  const int centerX = (screenW - kCenterCoverMaxW) / 2;
+  const int centerTileY = coverRect.y + kCoverTopPad;
+  renderer.drawRoundedRect(centerX - kCenterOutlineW, centerTileY - kCenterOutlineW,
+                           kCenterCoverMaxW + 2 * kCenterOutlineW, kCenterCoverMaxH + 2 * kCenterOutlineW,
+                           kSelectionLineW, kCornerRadius + 2, true);
+}
+
+// ---------------------------------------------------------------------------
 // Carousel cover strip
 // ---------------------------------------------------------------------------
 void LyraCarouselTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect,

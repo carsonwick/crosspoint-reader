@@ -14,6 +14,7 @@
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
+#include "components/themes/lyra/LyraCarouselTheme.h"
 #include "MappedInputManager.h"
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
@@ -105,6 +106,11 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
 
   recentsLoaded = true;
   recentsLoading = false;
+
+  if (static_cast<CrossPointSettings::UI_THEME>(SETTINGS.uiTheme) == CrossPointSettings::UI_THEME::LYRA_CAROUSEL) {
+    preRenderCarouselFrames();
+    requestUpdate();
+  }
 }
 
 void HomeActivity::onEnter() {
@@ -114,6 +120,7 @@ void HomeActivity::onEnter() {
   hasOpdsUrl = strlen(SETTINGS.opdsServerUrl) > 0;
 
   selectorIndex = 0;
+  carouselFramesReady = false;
 
   const auto& metrics = UITheme::getInstance().getMetrics();
   loadRecentBooks(metrics.homeRecentBooksCount);
@@ -125,8 +132,8 @@ void HomeActivity::onEnter() {
 void HomeActivity::onExit() {
   Activity::onExit();
 
-  // Free the stored cover buffer if any
   freeCoverBuffer();
+  freeCarouselFrames();
 }
 
 bool HomeActivity::storeCoverBuffer() {
@@ -168,6 +175,63 @@ void HomeActivity::freeCoverBuffer() {
     free(coverBuffer);
     coverBuffer = nullptr;
   }
+  coverBufferStored = false;
+}
+
+void HomeActivity::freeCarouselFrames() {
+  for (int i = 0; i < kCarouselFrameCount; ++i) {
+    if (carouselFrames[i]) {
+      free(carouselFrames[i]);
+      carouselFrames[i] = nullptr;
+    }
+  }
+  carouselFramesReady = false;
+}
+
+void HomeActivity::preRenderCarouselFrames() {
+  const int bookCount = static_cast<int>(recentBooks.size());
+  if (bookCount == 0) return;
+
+  uint8_t* frameBuffer = renderer.getFrameBuffer();
+  if (!frameBuffer) return;
+
+  const size_t bufferSize = GfxRenderer::getBufferSize();
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const int pageWidth = renderer.getScreenWidth();
+
+  // Free coverBuffer first to reclaim 48KB before allocating 3 frames
+  freeCoverBuffer();
+  freeCarouselFrames();
+
+  const int frameCount = std::min(bookCount, kCarouselFrameCount);
+  for (int i = 0; i < frameCount; ++i) {
+    carouselFrames[i] = static_cast<uint8_t*>(malloc(bufferSize));
+    if (!carouselFrames[i]) {
+      LOG_ERR("HOME", "preRenderCarouselFrames: malloc failed for frame %d", i);
+      freeCarouselFrames();
+      return;
+    }
+  }
+
+  // Render each carousel arrangement (no selection border) into its frame
+  bool dummy1 = false, dummy2 = false, dummy3 = false;
+  for (int i = 0; i < frameCount; ++i) {
+    LyraCarouselTheme::setPreRenderIndex(i);
+    dummy1 = false;
+    dummy2 = false;
+    dummy3 = false;
+
+    renderer.clearScreen();
+    GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.homeTopPadding}, nullptr);
+    GUI.drawRecentBookCover(renderer, Rect{0, metrics.homeTopPadding, pageWidth, metrics.homeCoverTileHeight},
+                            recentBooks, bookCount,  // bookCount → icon row mode, no border
+                            dummy1, dummy2, dummy3, []() { return true; });
+
+    memcpy(carouselFrames[i], frameBuffer, bufferSize);
+  }
+
+  carouselFramesReady = true;
+  coverRendered = false;
   coverBufferStored = false;
 }
 
@@ -255,6 +319,44 @@ void HomeActivity::render(RenderLock&&) {
   const auto& metrics = UITheme::getInstance().getMetrics();
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();
+
+  // Fast path: pre-rendered frames ready — memcpy + border overlay
+  if (carouselFramesReady) {
+    uint8_t* frameBuffer = renderer.getFrameBuffer();
+    const int bookCount = static_cast<int>(recentBooks.size());
+    const bool inCarouselRow = (selectorIndex < bookCount);
+    const int frameIdx = inCarouselRow ? selectorIndex : lastCarouselBookIndex;
+
+    if (frameBuffer && frameIdx >= 0 && frameIdx < kCarouselFrameCount && carouselFrames[frameIdx]) {
+      memcpy(frameBuffer, carouselFrames[frameIdx], GfxRenderer::getBufferSize());
+
+      GUI.drawCarouselBorder(renderer, Rect{0, metrics.homeTopPadding, pageWidth, metrics.homeCoverTileHeight},
+                             inCarouselRow);
+
+      std::vector<const char*> menuItems = {tr(STR_BROWSE_FILES), tr(STR_MENU_RECENT_BOOKS), tr(STR_FILE_TRANSFER),
+                                            tr(STR_SETTINGS_TITLE)};
+      std::vector<UIIcon> menuIcons = {Folder, Recent, Transfer, Settings};
+      if (hasOpdsUrl) {
+        menuItems.insert(menuItems.begin() + 2, tr(STR_OPDS_BROWSER));
+        menuIcons.insert(menuIcons.begin() + 2, Library);
+      }
+
+      GUI.drawButtonMenu(
+          renderer,
+          Rect{0, metrics.homeTopPadding + metrics.homeCoverTileHeight + metrics.verticalSpacing, pageWidth,
+               pageHeight - (metrics.headerHeight + metrics.homeTopPadding + metrics.verticalSpacing * 2 +
+                             metrics.buttonHintsHeight)},
+          static_cast<int>(menuItems.size()), selectorIndex - recentBooks.size(),
+          [&menuItems](int index) { return std::string(menuItems[index]); },
+          [&menuIcons](int index) { return menuIcons[index]; });
+
+      const auto labels = mappedInput.mapLabels("", tr(STR_SELECT), tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT));
+      GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+
+      renderer.displayBuffer();
+      return;
+    }
+  }
 
   renderer.clearScreen();
   bool bufferRestored = coverBufferStored && restoreCoverBuffer();
