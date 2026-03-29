@@ -103,13 +103,8 @@ void LyraCarouselTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect,
       if (Storage.openFileForRead("HOME", thumbPath, file)) {
         Bitmap bitmap(file);
         if (bitmap.parseHeaders() == BmpReaderError::Ok) {
-          // Fixed height, proportional width: scale to fill maxH exactly, derive
-          // width from the bitmap aspect ratio capped at maxW. Centre horizontally.
-          const int bmpW = bitmap.getWidth();
-          const int bmpH = bitmap.getHeight();
-          const int displayW = (bmpH > 0) ? std::min(maxW, bmpW * maxH / bmpH) : maxW;
-          const int drawX = x + (maxW - displayW) / 2;
-          renderer.drawBitmap(bitmap, drawX, y, displayW, maxH, 0.0f, 0.0f);
+          // Fit within tile at original aspect ratio — no cropping, no stretching.
+          renderer.drawBitmap(bitmap, x, y, maxW, maxH, 0.0f, 0.0f);
           hasCover = true;
         }
         file.close();
