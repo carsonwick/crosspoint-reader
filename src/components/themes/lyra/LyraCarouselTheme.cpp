@@ -27,6 +27,7 @@ constexpr int kCoverTopPad = 10;
 
 constexpr int kCornerRadius = 6;
 constexpr int kSelectionLineW = 2;
+constexpr int kCenterOutlineW = 4;  // white ring around centre cover; black border overlays when selected
 
 // Icon row — icons are 32×32 bitmaps; drawIcon does NOT scale
 constexpr int kMenuIconSize = 32;  // must match actual bitmap dimensions
@@ -136,16 +137,11 @@ void LyraCarouselTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect,
       const int nextIdx = (centerIdx + 1) % bookCount;
       drawCover(prevIdx, leftX, sideTileY, kSideCoverMaxW, kSideCoverMaxH);
       drawCover(nextIdx, rightX, sideTileY, kSideCoverMaxW, kSideCoverMaxH);
-      // Horizontal stripe overlay — draws black every 3rd row (additive, never
-      // clears pixels) so the cover image shows through the gaps.
-      for (int row = sideTileY; row < sideTileY + kSideCoverMaxH; row += 3) {
-        renderer.fillRect(leftX, row, kSideCoverMaxW, 1, true);
-        renderer.fillRect(rightX, row, kSideCoverMaxW, 1, true);
-      }
     }
-    // Clear centre area to white before drawing centre cover so the centre
-    // cover always occludes any black pixels painted by the side covers.
-    renderer.fillRect(centerX, centerTileY, kCenterCoverMaxW, kCenterCoverMaxH, false);
+    // Clear a white outline ring around the centre cover, then draw the cover
+    // inside it. The white ring always separates the centre from the sides.
+    renderer.fillRect(centerX - kCenterOutlineW, centerTileY - kCenterOutlineW,
+                      kCenterCoverMaxW + 2 * kCenterOutlineW, kCenterCoverMaxH + 2 * kCenterOutlineW, false);
     drawCover(centerIdx, centerX, centerTileY, kCenterCoverMaxW, kCenterCoverMaxH);
 
     coverBufferStored = storeCoverBuffer();
@@ -154,7 +150,8 @@ void LyraCarouselTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect,
 
   // Selection border on top of centre cover when carousel row is active
   if (selectorIndex < bookCount) {
-    renderer.drawRoundedRect(centerX - 4, centerTileY - 4, kCenterCoverMaxW + 8, kCenterCoverMaxH + 8,
+    renderer.drawRoundedRect(centerX - kCenterOutlineW, centerTileY - kCenterOutlineW,
+                             kCenterCoverMaxW + 2 * kCenterOutlineW, kCenterCoverMaxH + 2 * kCenterOutlineW,
                              kSelectionLineW, kCornerRadius + 2, true);
   }
 }
