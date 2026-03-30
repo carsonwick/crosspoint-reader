@@ -172,6 +172,7 @@ void GfxRenderer::drawPixel(const int x, const int y, const bool state) const {
 
   // Bounds checking against physical panel dimensions
   if (phyX < 0 || phyX >= HalDisplay::DISPLAY_WIDTH || phyY < 0 || phyY >= HalDisplay::DISPLAY_HEIGHT) {
+    LOG_DBG("GFX", "!! Outside range (%d, %d) -> (%d, %d)", x, y, phyX, phyY);
     return;
   }
 
