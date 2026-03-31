@@ -15,10 +15,10 @@
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
-#include "components/themes/lyra/LyraCarouselTheme.h"
 #include "MappedInputManager.h"
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
+#include "components/themes/lyra/LyraCarouselTheme.h"
 #include "fontIds.h"
 
 // ---------------------------------------------------------------------------
@@ -74,11 +74,6 @@ void HomeActivity::loadRecentBooks(int maxBooks) {
       break;
     }
 
-    // Skip if file no longer exists
-    if (!Storage.exists(book.path.c_str())) {
-      continue;
-    }
-
     recentBooks.push_back(book);
   }
 }
@@ -90,8 +85,8 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
   bool bookUpdated[LyraCarouselMetrics::values.homeRecentBooksCount] = {};
   Rect popupRect;
 
-  const bool isCarouselTheme = static_cast<CrossPointSettings::UI_THEME>(SETTINGS.uiTheme) ==
-                               CrossPointSettings::UI_THEME::LYRA_CAROUSEL;
+  const bool isCarouselTheme =
+      static_cast<CrossPointSettings::UI_THEME>(SETTINGS.uiTheme) == CrossPointSettings::UI_THEME::LYRA_CAROUSEL;
 
   int progress = 0;
   for (RecentBook& book : recentBooks) {
@@ -99,10 +94,10 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
       if (isCarouselTheme) {
         // For carousel: generate exact-size thumbnails for center and side slots.
         // Load the source image once even when both sizes are missing.
-        const std::string centerPath = UITheme::getCoverThumbPath(
-            book.coverBmpPath, LyraCarouselTheme::kCenterCoverW, LyraCarouselTheme::kCenterCoverH);
-        const std::string sidePath = UITheme::getCoverThumbPath(
-            book.coverBmpPath, LyraCarouselTheme::kSideCoverW, LyraCarouselTheme::kSideCoverH);
+        const std::string centerPath = UITheme::getCoverThumbPath(book.coverBmpPath, LyraCarouselTheme::kCenterCoverW,
+                                                                  LyraCarouselTheme::kCenterCoverH);
+        const std::string sidePath = UITheme::getCoverThumbPath(book.coverBmpPath, LyraCarouselTheme::kSideCoverW,
+                                                                LyraCarouselTheme::kSideCoverH);
         const bool centerMissing = !Storage.exists(centerPath.c_str());
         const bool sideMissing = !Storage.exists(sidePath.c_str());
 
@@ -117,8 +112,8 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
             GUI.fillPopupProgress(renderer, popupRect, 10 + progress * (90 / recentBooks.size()));
             bool success = true;
             if (centerMissing)
-              success = epub.generateThumbBmp(LyraCarouselTheme::kCenterCoverW, LyraCarouselTheme::kCenterCoverH) &&
-                        success;
+              success =
+                  epub.generateThumbBmp(LyraCarouselTheme::kCenterCoverW, LyraCarouselTheme::kCenterCoverH) && success;
             if (sideMissing)
               success =
                   epub.generateThumbBmp(LyraCarouselTheme::kSideCoverW, LyraCarouselTheme::kSideCoverH) && success;
@@ -360,8 +355,8 @@ void HomeActivity::preRenderCarouselFrames() {
 }
 
 void HomeActivity::loop() {
-  const bool isCarousel = static_cast<CrossPointSettings::UI_THEME>(SETTINGS.uiTheme) ==
-                          CrossPointSettings::UI_THEME::LYRA_CAROUSEL;
+  const bool isCarousel =
+      static_cast<CrossPointSettings::UI_THEME>(SETTINGS.uiTheme) == CrossPointSettings::UI_THEME::LYRA_CAROUSEL;
 
   if (isCarousel) {
     const int bookCount = static_cast<int>(recentBooks.size());
@@ -481,6 +476,15 @@ void HomeActivity::render(RenderLock&&) {
       renderer.displayBuffer();
       // E-ink refresh complete — pre-render the missing adjacent frame while idle.
       updateSlidingWindowCache(centerIdx, bookCount);
+      // Mirror the slow-path trigger: generate missing thumbnails on the second
+      // render so the E-ink is already showing something before the SD work starts.
+      if (!firstRenderDone) {
+        firstRenderDone = true;
+        requestUpdate();
+      } else if (!recentsLoaded && !recentsLoading) {
+        recentsLoading = true;
+        loadRecentCovers(metrics.homeCoverHeight);
+      }
       return;
     }
   }
@@ -514,11 +518,10 @@ void HomeActivity::render(RenderLock&&) {
       [&menuItems](int index) { return std::string(menuItems[index]); },
       [&menuIcons](int index) { return menuIcons[index]; });
 
-  const bool isCarouselTheme = static_cast<CrossPointSettings::UI_THEME>(SETTINGS.uiTheme) ==
-                               CrossPointSettings::UI_THEME::LYRA_CAROUSEL;
-  const auto labels = isCarouselTheme
-                          ? mappedInput.mapLabels("", tr(STR_SELECT), tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT))
-                          : mappedInput.mapLabels("", tr(STR_SELECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+  const bool isCarouselTheme =
+      static_cast<CrossPointSettings::UI_THEME>(SETTINGS.uiTheme) == CrossPointSettings::UI_THEME::LYRA_CAROUSEL;
+  const auto labels = isCarouselTheme ? mappedInput.mapLabels("", tr(STR_SELECT), tr(STR_DIR_LEFT), tr(STR_DIR_RIGHT))
+                                      : mappedInput.mapLabels("", tr(STR_SELECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 
   renderer.displayBuffer();

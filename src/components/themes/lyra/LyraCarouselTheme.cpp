@@ -9,13 +9,13 @@
 
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
-#include "fontIds.h"
 #include "components/icons/book.h"
 #include "components/icons/cover.h"
 #include "components/icons/folder.h"
 #include "components/icons/recent.h"
 #include "components/icons/settings2.h"
 #include "components/icons/transfer.h"
+#include "fontIds.h"
 
 namespace {
 // Cover layout — centre cover dominates, sides slide kOverlap px behind it
@@ -27,8 +27,8 @@ constexpr int kOverlap = 60;
 constexpr int kCoverTopPad = 10;
 
 constexpr int kTitleFontId = UI_12_FONT_ID;
-constexpr int kDotSize = 8;    // px square dot
-constexpr int kDotGap = 6;     // px between dots
+constexpr int kDotSize = 8;  // px square dot
+constexpr int kDotGap = 6;   // px between dots
 
 constexpr int kCornerRadius = 6;
 constexpr int kThinOutlineW = 1;    // always-visible outline around centre cover
@@ -36,9 +36,9 @@ constexpr int kSelectionLineW = 3;  // thicker outline when centre cover is sele
 constexpr int kCenterOutlineW = 4;  // white ring around centre cover
 
 // Icon row — icons are 32×32 bitmaps; drawIcon does NOT scale
-constexpr int kMenuIconSize = 32;   // must match actual bitmap dimensions
-constexpr int kMenuIconPad = 14;    // symmetric vertical padding → tile height = 60
-constexpr int kHighlightPad = 12;   // horizontal padding around the icon on each side
+constexpr int kMenuIconSize = 32;  // must match actual bitmap dimensions
+constexpr int kMenuIconPad = 14;   // symmetric vertical padding → tile height = 60
+constexpr int kHighlightPad = 12;  // horizontal padding around the icon on each side
 // Row is anchored to the bottom of the screen, just above button hints
 constexpr int kButtonHintsH = LyraCarouselMetrics::values.buttonHintsHeight;
 
@@ -122,8 +122,7 @@ void LyraCarouselTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect,
         if (bitmap.parseHeaders() == BmpReaderError::Ok) {
           // Height always fills the tile. Only crop horizontally if the cover is
           // wider than the tile; narrow covers get white space on the sides.
-          const float bmpRatio =
-              static_cast<float>(bitmap.getWidth()) / static_cast<float>(bitmap.getHeight());
+          const float bmpRatio = static_cast<float>(bitmap.getWidth()) / static_cast<float>(bitmap.getHeight());
           const float tileRatio = static_cast<float>(maxW) / static_cast<float>(maxH);
           const float cropX = (bmpRatio > tileRatio) ? (1.0f - tileRatio / bmpRatio) : 0.0f;
           renderer.drawBitmap(bitmap, x, y, maxW, maxH, cropX, 0.0f);
@@ -163,8 +162,8 @@ void LyraCarouselTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect,
 
     // Clear a white outline ring around the centre cover, then draw the cover
     // inside it. The white ring always separates the centre from the sides.
-    renderer.fillRect(centerX - kCenterOutlineW, centerTileY - kCenterOutlineW,
-                      kCenterCoverMaxW + 2 * kCenterOutlineW, kCenterCoverMaxH + 2 * kCenterOutlineW, false);
+    renderer.fillRect(centerX - kCenterOutlineW, centerTileY - kCenterOutlineW, kCenterCoverMaxW + 2 * kCenterOutlineW,
+                      kCenterCoverMaxH + 2 * kCenterOutlineW, false);
     drawCover(centerIdx, centerX, centerTileY, kCenterCoverMaxW, kCenterCoverMaxH);
 
     // Dots — centred over the cover tile, count = actual book count
@@ -172,8 +171,10 @@ void LyraCarouselTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect,
     const int totalDotsW = bookCount * kDotSize + (bookCount - 1) * kDotGap;
     int dotX = centerX + (kCenterCoverMaxW - totalDotsW) / 2;
     for (int i = 0; i < bookCount; ++i) {
-      if (i == centerIdx) renderer.fillRect(dotX, dotsY, kDotSize, kDotSize, true);
-      else renderer.drawRect(dotX, dotsY, kDotSize, kDotSize, true);
+      if (i == centerIdx)
+        renderer.fillRect(dotX, dotsY, kDotSize, kDotSize, true);
+      else
+        renderer.drawRect(dotX, dotsY, kDotSize, kDotSize, true);
       dotX += kDotSize + kDotGap;
     }
 
@@ -232,4 +233,3 @@ void LyraCarouselTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int but
     }
   }
 }
-
