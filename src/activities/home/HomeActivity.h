@@ -37,9 +37,9 @@ class HomeActivity final : public Activity {
   void onOpdsBrowserOpen();
 
   int getMenuItemCount() const;
-  bool storeCoverBuffer();       // Store frame buffer for cover image
-  bool restoreCoverBuffer();     // Restore frame buffer from stored cover
-  void freeCoverBuffer();        // Free the stored cover buffer
+  bool storeCoverBuffer();    // Store frame buffer for cover image
+  bool restoreCoverBuffer();  // Restore frame buffer from stored cover
+  void freeCoverBuffer();     // Free the stored cover buffer
   void preRenderCarouselFrames();
   void freeCarouselFrames();
   void renderCarouselFrame(int bookIdx, int slotIdx);
