@@ -165,6 +165,13 @@ void LyraCarouselTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect,
     renderer.fillRect(centerX - kCenterOutlineW, centerTileY - kCenterOutlineW, kCenterCoverMaxW + 2 * kCenterOutlineW,
                       kCenterCoverMaxH + 2 * kCenterOutlineW, false);
     drawCover(centerIdx, centerX, centerTileY, kCenterCoverMaxW, kCenterCoverMaxH);
+    // Mask the 4 bitmap corners white so dithered pixels don't bleed outside
+    // the rounded border. r×r squares — at kCornerRadius=6 the loss is invisible.
+    renderer.fillRect(centerX, centerTileY, kCornerRadius, kCornerRadius, false);
+    renderer.fillRect(centerX + kCenterCoverMaxW - kCornerRadius, centerTileY, kCornerRadius, kCornerRadius, false);
+    renderer.fillRect(centerX, centerTileY + kCenterCoverMaxH - kCornerRadius, kCornerRadius, kCornerRadius, false);
+    renderer.fillRect(centerX + kCenterCoverMaxW - kCornerRadius, centerTileY + kCenterCoverMaxH - kCornerRadius,
+                      kCornerRadius, kCornerRadius, false);
 
     // Dots — centred over the cover tile, count = actual book count
     const int dotsY = centerTileY + kCenterCoverMaxH + 8;
