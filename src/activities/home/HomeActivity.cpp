@@ -90,6 +90,10 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
 
   int progress = 0;
   for (RecentBook& book : recentBooks) {
+    if (!Storage.exists(book.path.c_str())) {
+      progress++;
+      continue;
+    }
     if (!book.coverBmpPath.empty()) {
       if (isCarouselTheme) {
         // For carousel: generate exact-size thumbnails for center and side slots.
