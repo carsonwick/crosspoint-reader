@@ -86,7 +86,8 @@ void HomeActivity::loadRecentBooks(int maxBooks) {
 void HomeActivity::loadRecentCovers(int coverHeight) {
   recentsLoading = true;
   bool showingLoading = false;
-  bool anyThumbnailGenerated = false;
+  // Tracks which book indices had a thumbnail generated this pass (max 5 books).
+  bool bookUpdated[LyraCarouselMetrics::values.homeRecentBooksCount] = {};
   Rect popupRect;
 
   const bool isCarouselTheme = static_cast<CrossPointSettings::UI_THEME>(SETTINGS.uiTheme) ==
@@ -125,7 +126,7 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
               RECENT_BOOKS.updateBook(book.path, book.title, book.author, "");
               book.coverBmpPath = "";
             } else {
-              anyThumbnailGenerated = true;
+              bookUpdated[progress] = true;
             }
             coverRendered = false;
             requestUpdate();
@@ -148,7 +149,7 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
                 RECENT_BOOKS.updateBook(book.path, book.title, book.author, "");
                 book.coverBmpPath = "";
               } else {
-                anyThumbnailGenerated = true;
+                bookUpdated[progress] = true;
               }
               coverRendered = false;
               requestUpdate();
@@ -172,7 +173,7 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
               RECENT_BOOKS.updateBook(book.path, book.title, book.author, "");
               book.coverBmpPath = "";
             } else {
-              anyThumbnailGenerated = true;
+              bookUpdated[progress] = true;
             }
             coverRendered = false;
             requestUpdate();
@@ -189,7 +190,7 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
                 RECENT_BOOKS.updateBook(book.path, book.title, book.author, "");
                 book.coverBmpPath = "";
               } else {
-                anyThumbnailGenerated = true;
+                bookUpdated[progress] = true;
               }
               coverRendered = false;
               requestUpdate();
@@ -204,13 +205,26 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
   recentsLoaded = true;
   recentsLoading = false;
 
-  // Re-render carousel frames only if new thumbnails were generated (cache is stale).
-  // Otherwise, onEnter() already pre-rendered the frames before the first display update.
-  if (anyThumbnailGenerated &&
-      static_cast<CrossPointSettings::UI_THEME>(SETTINGS.uiTheme) == CrossPointSettings::UI_THEME::LYRA_CAROUSEL) {
-    invalidateCarouselCache();
-    preRenderCarouselFrames();
-    requestUpdate();
+  // Re-render only the affected slots rather than rebuilding the entire cache.
+  if (isCarouselTheme) {
+    bool anyUpdated = false;
+    for (int i = 0; i < static_cast<int>(recentBooks.size()); ++i) {
+      if (!bookUpdated[i]) continue;
+      anyUpdated = true;
+      if (carouselFramesReady) {
+        // Only re-render the slot holding this book; books outside the window
+        // will be picked up by updateSlidingWindowCache on next navigation.
+        const int slot = findFrameSlot(i);
+        if (slot >= 0) renderCarouselFrame(i, slot);
+      }
+    }
+    if (anyUpdated) {
+      if (!carouselFramesReady) {
+        // Cache not yet initialised (shouldn't happen) — fall back to full render.
+        preRenderCarouselFrames();
+      }
+      requestUpdate();
+    }
   }
 }
 
