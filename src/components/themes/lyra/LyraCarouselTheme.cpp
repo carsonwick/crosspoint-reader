@@ -229,7 +229,9 @@ void LyraCarouselTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int but
 
     const bool selected = (selectedIndex == i);
     if (selected) {
-      renderer.fillRect(iconX - kHighlightPad, rowY + 4, kMenuIconSize + 2 * kHighlightPad, tileH - 8, true);
+      const int highlightSize = kMenuIconSize + 2 * kHighlightPad;
+      const int highlightY = rowY + (tileH - highlightSize) / 2;
+      renderer.fillRect(iconX - kHighlightPad, highlightY, highlightSize, highlightSize, true);
     }
 
     if (rowIcon != nullptr) {
