@@ -72,8 +72,7 @@ void LyraCarouselTheme::drawCarouselBorder(GfxRenderer& renderer, Rect coverRect
   const int screenW = renderer.getScreenWidth();
   const int centerX = (screenW - kCenterCoverMaxW) / 2;
   const int centerTileY = coverRect.y + kCoverTopPad;
-  renderer.drawRoundedRect(centerX, centerTileY, kCenterCoverMaxW, kCenterCoverMaxH, kSelectionLineW, kCornerRadius,
-                           true);
+  renderer.drawRect(centerX, centerTileY, kCenterCoverMaxW, kCenterCoverMaxH, kSelectionLineW, true);
 }
 
 // ---------------------------------------------------------------------------
@@ -165,21 +164,6 @@ void LyraCarouselTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect,
     renderer.fillRect(centerX - kCenterOutlineW, centerTileY - kCenterOutlineW, kCenterCoverMaxW + 2 * kCenterOutlineW,
                       kCenterCoverMaxH + 2 * kCenterOutlineW, false);
     drawCover(centerIdx, centerX, centerTileY, kCenterCoverMaxW, kCenterCoverMaxH);
-    // Mask the 4 bitmap corners: clear the r×r square white then fill the
-    // quarter-disc black via a single-corner fillRoundedRect on a (r+1)×(r+1)
-    // tile. White outside the arc, black inside — invisible on dark covers,
-    // reads as a designed rounded cutoff on light covers.
-    const int r = kCornerRadius;
-    const int cR = kCenterCoverMaxW - r - 1;  // right arc column offset
-    const int cB = kCenterCoverMaxH - r - 1;  // bottom arc row offset
-    renderer.fillRect(centerX, centerTileY, r, r, false);
-    renderer.fillRoundedRect(centerX, centerTileY, r + 1, r + 1, r, true, false, false, false, Color::Black);
-    renderer.fillRect(centerX + kCenterCoverMaxW - r, centerTileY, r, r, false);
-    renderer.fillRoundedRect(centerX + cR, centerTileY, r + 1, r + 1, r, false, true, false, false, Color::Black);
-    renderer.fillRect(centerX, centerTileY + kCenterCoverMaxH - r, r, r, false);
-    renderer.fillRoundedRect(centerX, centerTileY + cB, r + 1, r + 1, r, false, false, true, false, Color::Black);
-    renderer.fillRect(centerX + kCenterCoverMaxW - r, centerTileY + kCenterCoverMaxH - r, r, r, false);
-    renderer.fillRoundedRect(centerX + cR, centerTileY + cB, r + 1, r + 1, r, false, false, false, true, Color::Black);
 
     // Dots — centred over the cover tile, count = actual book count
     const int dotsY = centerTileY + kCenterCoverMaxH + 8;
@@ -213,7 +197,7 @@ void LyraCarouselTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect,
   // Always outline the centre cover at its own edge (white ring sits outside the black line);
   // thicker when the carousel row is active
   const int outlineW = inCarouselRow ? kSelectionLineW : kThinOutlineW;
-  renderer.drawRoundedRect(centerX, centerTileY, kCenterCoverMaxW, kCenterCoverMaxH, outlineW, kCornerRadius, true);
+  renderer.drawRect(centerX, centerTileY, kCenterCoverMaxW, kCenterCoverMaxH, outlineW, true);
 }
 
 // ---------------------------------------------------------------------------
