@@ -302,32 +302,85 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
           // Resolve the image path relative to the HTML file
           std::string resolvedPath = FsHelpers::normalisePath(self->contentBase + src);
 
-          if (ImageDecoderFactory::isFormatSupported(resolvedPath)) {
-            // Create a unique filename for the cached image
+          // Shared result: set by whichever path succeeds
+          std::string finalImagePath;
+          ImageDimensions dims = {0, 0};
+
+          // ── Fast path: pre-built PXC in EPUB (no JPEG extraction or decode needed) ──
+          {
+            const size_t pxcDot = resolvedPath.rfind('.');
+            const std::string resolvedPxcPath = pxcDot != std::string::npos
+                                                    ? resolvedPath.substr(0, pxcDot) + ".pxc"
+                                                    : resolvedPath + ".pxc";
+            size_t embeddedPxcSize = 0;
+            if (self->epub->getItemSize(resolvedPxcPath, &embeddedPxcSize) && embeddedPxcSize > 4) {
+              const std::string cachedPxcPath =
+                  self->imageBasePath + std::to_string(self->imageCounter++) + ".pxc";
+              FsFile pxcFile;
+              bool pxcOk = false;
+              if (Storage.openFileForWrite("EHP", cachedPxcPath, pxcFile)) {
+                pxcOk = self->epub->readItemContentsToStream(resolvedPxcPath, pxcFile, 4096);
+                pxcFile.flush();
+                pxcFile.close();
+                delay(50);
+              }
+              if (pxcOk) {
+                // Dims from PXC header: uint16_t width, uint16_t height (LE)
+                FsFile hdrFile;
+                if (Storage.openFileForRead("EHP", cachedPxcPath, hdrFile)) {
+                  uint16_t pw = 0, ph = 0;
+                  if (hdrFile.read(&pw, 2) == 2 && hdrFile.read(&ph, 2) == 2) {
+                    dims.width = pw;
+                    dims.height = ph;
+                  }
+                  hdrFile.close();
+                }
+              }
+              if (dims.width > 0 && dims.height > 0) {
+                finalImagePath = cachedPxcPath;
+                LOG_DBG("EHP", "PXC fast path: %dx%d", dims.width, dims.height);
+              } else {
+                // Header read failed — reclaim counter and fall through to JPEG
+                if (pxcOk) Storage.remove(cachedPxcPath.c_str());
+                self->imageCounter--;
+              }
+            }
+          }
+
+          // ── Fallback: extract JPEG, read dims from decoder ──
+          if (finalImagePath.empty() && ImageDecoderFactory::isFormatSupported(resolvedPath)) {
             std::string ext;
-            size_t extPos = resolvedPath.rfind('.');
-            if (extPos != std::string::npos) {
-              ext = resolvedPath.substr(extPos);
-            }
-            std::string cachedImagePath = self->imageBasePath + std::to_string(self->imageCounter++) + ext;
+            const size_t extPos = resolvedPath.rfind('.');
+            if (extPos != std::string::npos) ext = resolvedPath.substr(extPos);
+            const std::string cachedImagePath =
+                self->imageBasePath + std::to_string(self->imageCounter++) + ext;
 
-            // Extract image to cache file
-            FsFile cachedImageFile;
-            bool extractSuccess = false;
-            if (Storage.openFileForWrite("EHP", cachedImagePath, cachedImageFile)) {
-              extractSuccess = self->epub->readItemContentsToStream(resolvedPath, cachedImageFile, 4096);
-              cachedImageFile.flush();
-              cachedImageFile.close();
-              delay(50);  // Give SD card time to sync
+            FsFile imgFile;
+            bool extractOk = false;
+            if (Storage.openFileForWrite("EHP", cachedImagePath, imgFile)) {
+              extractOk = self->epub->readItemContentsToStream(resolvedPath, imgFile, 4096);
+              imgFile.flush();
+              imgFile.close();
+              delay(50);
             }
-
-            if (extractSuccess) {
-              // Get image dimensions
-              ImageDimensions dims = {0, 0};
+            if (extractOk) {
               ImageToFramebufferDecoder* decoder = ImageDecoderFactory::getDecoder(cachedImagePath);
               if (decoder && decoder->getDimensions(cachedImagePath, dims)) {
+                finalImagePath = cachedImagePath;
                 LOG_DBG("EHP", "Image dimensions: %dx%d", dims.width, dims.height);
+              } else {
+                LOG_ERR("EHP", "Failed to get image dimensions");
+                Storage.remove(cachedImagePath.c_str());
+                self->imageCounter--;
+              }
+            } else {
+              LOG_ERR("EHP", "Failed to extract image");
+              self->imageCounter--;
+            }
+          }
 
+          // ── Shared layout and page placement ──
+          if (!finalImagePath.empty() && dims.width > 0 && dims.height > 0) {
                 int displayWidth = 0;
                 int displayHeight = 0;
                 const float emSize = static_cast<float>(self->renderer.getFontAscenderSize(self->fontId));
@@ -445,7 +498,7 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
                 }
 
                 // Create ImageBlock and add to page
-                auto imageBlock = std::make_shared<ImageBlock>(cachedImagePath, displayWidth, displayHeight);
+                auto imageBlock = std::make_shared<ImageBlock>(finalImagePath, displayWidth, displayHeight);
                 if (!imageBlock) {
                   LOG_ERR("EHP", "Failed to create ImageBlock");
                   return;
@@ -461,14 +514,7 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
 
                 self->depth += 1;
                 return;
-              } else {
-                LOG_ERR("EHP", "Failed to get image dimensions");
-                Storage.remove(cachedImagePath.c_str());
-              }
-            } else {
-              LOG_ERR("EHP", "Failed to extract image");
-            }
-          }  // isFormatSupported
+          }  // layout and placement
         }
       }
 
