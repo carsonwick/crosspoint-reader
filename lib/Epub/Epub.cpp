@@ -369,6 +369,20 @@ bool Epub::load(const bool buildIfMissing, const bool skipLoadingCss) {
   LOG_DBG("EBP", "Cache not found, building spine/TOC cache");
   setupCacheDir();
 
+  // Fast path: extract pre-built book.bin embedded in the EPUB (if present)
+  if (extractPrebuiltBookBin()) {
+    bookMetadataCache.reset(new BookMetadataCache(cachePath));
+    if (bookMetadataCache->load()) {
+      if (!skipLoadingCss) {
+        parseCssFiles();
+      }
+      LOG_DBG("EBP", "Loaded ePub from pre-built cache: %s", filepath.c_str());
+      return true;
+    }
+    LOG_ERR("EBP", "Pre-built book.bin failed to load, rebuilding from scratch");
+    bookMetadataCache.reset(new BookMetadataCache(cachePath));
+  }
+
   const uint32_t indexingStart = millis();
 
   // Begin building cache - stream entries to disk immediately
@@ -483,6 +497,35 @@ void Epub::setupCacheDir() const {
   }
 
   Storage.mkdir(cachePath.c_str());
+}
+
+bool Epub::extractPrebuiltBookBin() const {
+  constexpr char EMBEDDED_PATH[] = "META-INF/crosspoint/book.bin";
+  const std::string destPath = cachePath + "/book.bin";
+
+  ZipFile zip(filepath);
+  size_t embeddedSize;
+  if (!zip.getInflatedFileSize(EMBEDDED_PATH, &embeddedSize)) {
+    return false;  // No pre-built cache in this EPUB
+  }
+
+  FsFile outFile;
+  if (!Storage.openFileForWrite("EBP", destPath, outFile)) {
+    LOG_ERR("EBP", "Failed to open %s for writing", destPath.c_str());
+    return false;
+  }
+
+  const bool ok = zip.readFileToStream(EMBEDDED_PATH, outFile, 512);
+  outFile.close();
+
+  if (!ok) {
+    LOG_ERR("EBP", "Failed to extract pre-built book.bin");
+    Storage.remove(destPath.c_str());
+    return false;
+  }
+
+  LOG_DBG("EBP", "Extracted pre-built book.bin (%zu bytes)", embeddedSize);
+  return true;
 }
 
 const std::string& Epub::getCachePath() const { return cachePath; }
