@@ -132,12 +132,19 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
             // Black (also paints over the grays in BW mode)
             renderer.drawPixel(screenX, screenY, pixelState);
           } else if (renderMode == GfxRenderer::GRAYSCALE_MSB && (bmpVal == 1 || (gpio.deviceIsX4() && bmpVal == 2))) {
-            // Light gray (also mark the MSB if it's going to be a dark gray too)
-            // X3 AA tuning: keep only the darker antialias level to avoid washed text
-            // We have to flag pixels in reverse for the gray buffers, as 0 leave alone, 1 update
+            // Differential MSB: mark dark gray (and light gray on X4) pixels
+            // clearScreen(0x00) background, drawPixel(false)=white marks "apply effect"
             renderer.drawPixel(screenX, screenY, false);
           } else if (renderMode == GfxRenderer::GRAYSCALE_LSB && bmpVal == 1) {
-            // Dark gray
+            // Differential LSB: mark dark gray pixels only
+            renderer.drawPixel(screenX, screenY, false);
+          } else if (renderMode == GfxRenderer::GRAY2_LSB && !(bmpVal & 1)) {
+            // Factory absolute LSB (BW RAM): set BW=1 for Black(0) and LightGrey(2)
+            // clearScreen(0x00) base; drawPixel(false) sets bit to 1
+            renderer.drawPixel(screenX, screenY, false);
+          } else if (renderMode == GfxRenderer::GRAY2_MSB && bmpVal < 2) {
+            // Factory absolute MSB (RED RAM): set RED=1 for Black(0) and DarkGrey(1)
+            // clearScreen(0x00) base; drawPixel(false) sets bit to 1
             renderer.drawPixel(screenX, screenY, false);
           }
         }
@@ -687,6 +694,12 @@ void GfxRenderer::drawBitmap(const Bitmap& bitmap, const int x, const int y, con
         drawPixel(screenX, screenY, false);
       } else if (renderMode == GRAYSCALE_LSB && val == 1) {
         drawPixel(screenX, screenY, false);
+      } else if (renderMode == GRAY2_LSB && !(val & 1)) {
+        // Factory absolute LSB: Black(0) and LightGrey(2) need BW bit=1
+        drawPixel(screenX, screenY, false);
+      } else if (renderMode == GRAY2_MSB && val < 2) {
+        // Factory absolute MSB: Black(0) and DarkGrey(1) need RED bit=1
+        drawPixel(screenX, screenY, false);
       }
     }
   }
@@ -1123,7 +1136,7 @@ void GfxRenderer::copyGrayscaleLsbBuffers() const { display.copyGrayscaleLsbBuff
 
 void GfxRenderer::copyGrayscaleMsbBuffers() const { display.copyGrayscaleMsbBuffers(frameBuffer); }
 
-void GfxRenderer::displayGrayBuffer() const { display.displayGrayBuffer(fadingFix); }
+void GfxRenderer::displayGrayBuffer(const unsigned char* lut, bool factoryMode) const { display.displayGrayBuffer(fadingFix, lut, factoryMode); }
 
 void GfxRenderer::freeBwBufferChunks() {
   for (auto& bwBufferChunk : bwBufferChunks) {
