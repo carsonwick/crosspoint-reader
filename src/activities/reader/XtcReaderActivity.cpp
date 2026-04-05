@@ -7,6 +7,7 @@
 
 #include "XtcReaderActivity.h"
 
+#include <EInkDisplay.h>
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
 #include <HalStorage.h>
@@ -209,66 +210,113 @@ void XtcReaderActivity::renderPage() {
       return (bit1 << 1) | bit2;
     };
 
-    // Optimized grayscale rendering without storeBwBuffer (saves 48KB peak memory)
-    // Flow: BW display → LSB/MSB passes → grayscale display → re-render BW for next frame
+    const bool useFactory = SETTINGS.grayRefreshMode == CrossPointSettings::GRAY_REFRESH_FACTORY_FAST ||
+                            SETTINGS.grayRefreshMode == CrossPointSettings::GRAY_REFRESH_FACTORY_QUALITY;
 
-    // Count pixel distribution for debugging
-    uint32_t pixelCounts[4] = {0, 0, 0, 0};
-    for (uint16_t y = 0; y < pageHeight; y++) {
-      for (uint16_t x = 0; x < pageWidth; x++) {
-        pixelCounts[getPixelValue(x, y)]++;
-      }
-    }
-    LOG_DBG("XTR", "Pixel distribution: White=%lu, DarkGrey=%lu, LightGrey=%lu, Black=%lu", pixelCounts[0],
-            pixelCounts[1], pixelCounts[2], pixelCounts[3]);
+    if (useFactory) {
+      // Factory absolute 2-bit encoding: single display update, no BW flash.
+      // BW RAM (0x24) = bit1: 1 for light gray(2) and black(3), 0 for white(0) and dark gray(1).
+      // RED RAM (0x26) = bit0: 1 for dark gray(1) and black(3), 0 for white(0) and light gray(2).
+      // clearScreen(0x00) base; drawPixel(false) sets bits that need 1.
 
-    // Pass 1: BW buffer - draw all non-white pixels as black
-    for (uint16_t y = 0; y < pageHeight; y++) {
-      for (uint16_t x = 0; x < pageWidth; x++) {
-        if (getPixelValue(x, y) >= 1) {
-          renderer.drawPixel(x, y, true);
+      const unsigned char* factoryLut = lut_factory_fast;
+      if (SETTINGS.grayRefreshMode == CrossPointSettings::GRAY_REFRESH_FACTORY_QUALITY)
+        factoryLut = lut_factory_quality;
+      else if (SETTINGS.grayRefreshMode == CrossPointSettings::GRAY_REFRESH_XFAST)
+        factoryLut = lut_xfast;
+
+      // Display LUT mapping: state0=White, state1=DarkGrey, state2=LightGrey, state3=Black.
+      // LUT state = (BW_bit << 1) | RED_bit = pv directly (pv=0=White...pv=3=Black).
+      // BW bit=0 where (pv >> 1) == 0 → pv=0 (White) and pv=1 (DarkGrey).
+      // RED bit=0 where (pv & 1) == 0 → pv=0 (White) and pv=2 (LightGrey).
+
+      // Plane1 → BW RAM (0x24): bit = (pv >> 1) & 1. bit=1 for LightGrey(2) and Black(3).
+      renderer.clearScreen(0x00);
+      for (uint16_t y = 0; y < pageHeight; y++) {
+        for (uint16_t x = 0; x < pageWidth; x++) {
+          if (getPixelValue(x, y) >= 2) {
+            renderer.drawPixel(x, y, false);
+          }
         }
       }
-    }
+      renderer.copyGrayscaleLsbBuffers();
 
-    // Display BW with conditional refresh based on pagesUntilFullRefresh
-    if (pagesUntilFullRefresh <= 1) {
-      renderer.displayBuffer(HalDisplay::HALF_REFRESH);
-      pagesUntilFullRefresh = SETTINGS.getRefreshFrequency();
+      // Plane2 → RED RAM (0x26): bit = pv & 1. bit=1 for DarkGrey(1) and Black(3).
+      renderer.clearScreen(0x00);
+      for (uint16_t y = 0; y < pageHeight; y++) {
+        for (uint16_t x = 0; x < pageWidth; x++) {
+          const uint8_t pv = getPixelValue(x, y);
+          if (pv == 1 || pv == 3) {
+            renderer.drawPixel(x, y, false);
+          }
+        }
+      }
+      renderer.copyGrayscaleMsbBuffers();
+
+      renderer.displayGrayBuffer(factoryLut, true);
     } else {
-      renderer.displayBuffer();
-      pagesUntilFullRefresh--;
-    }
+      // Original differential mode: BW flash first, then gray overlay.
+      // Optimized grayscale rendering without storeBwBuffer (saves 48KB peak memory).
 
-    // Pass 2: LSB buffer - mark DARK gray only (XTH value 1)
-    // In LUT: 0 bit = apply gray effect, 1 bit = untouched
-    renderer.clearScreen(0x00);
-    for (uint16_t y = 0; y < pageHeight; y++) {
-      for (uint16_t x = 0; x < pageWidth; x++) {
-        if (getPixelValue(x, y) == 1) {  // Dark grey only
-          renderer.drawPixel(x, y, false);
+      // Count pixel distribution for debugging
+      uint32_t pixelCounts[4] = {0, 0, 0, 0};
+      for (uint16_t y = 0; y < pageHeight; y++) {
+        for (uint16_t x = 0; x < pageWidth; x++) {
+          pixelCounts[getPixelValue(x, y)]++;
         }
       }
-    }
-    renderer.copyGrayscaleLsbBuffers();
+      LOG_DBG("XTR", "Pixel distribution: White=%lu, DarkGrey=%lu, LightGrey=%lu, Black=%lu", pixelCounts[0],
+              pixelCounts[1], pixelCounts[2], pixelCounts[3]);
 
-    // Pass 3: MSB buffer - mark LIGHT AND DARK gray (XTH value 1 or 2)
-    // In LUT: 0 bit = apply gray effect, 1 bit = untouched
-    renderer.clearScreen(0x00);
-    for (uint16_t y = 0; y < pageHeight; y++) {
-      for (uint16_t x = 0; x < pageWidth; x++) {
-        const uint8_t pv = getPixelValue(x, y);
-        if (pv == 1 || pv == 2) {  // Dark grey or Light grey
-          renderer.drawPixel(x, y, false);
+      // Pass 1: BW buffer - draw all non-white pixels as black
+      for (uint16_t y = 0; y < pageHeight; y++) {
+        for (uint16_t x = 0; x < pageWidth; x++) {
+          if (getPixelValue(x, y) >= 1) {
+            renderer.drawPixel(x, y, true);
+          }
         }
       }
+
+      // Display BW with conditional refresh based on pagesUntilFullRefresh
+      if (pagesUntilFullRefresh <= 1) {
+        renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+        pagesUntilFullRefresh = SETTINGS.getRefreshFrequency();
+      } else {
+        renderer.displayBuffer();
+        pagesUntilFullRefresh--;
+      }
+
+      // Pass 2: LSB buffer - mark DARK gray only (value==1)
+      // In LUT: 0 = apply gray effect, 1 = untouched
+      renderer.clearScreen(0x00);
+      for (uint16_t y = 0; y < pageHeight; y++) {
+        for (uint16_t x = 0; x < pageWidth; x++) {
+          if (getPixelValue(x, y) == 1) {
+            renderer.drawPixel(x, y, false);
+          }
+        }
+      }
+      renderer.copyGrayscaleLsbBuffers();
+
+      // Pass 3: MSB buffer - mark LIGHT AND DARK gray (value==1 or 2)
+      renderer.clearScreen(0x00);
+      for (uint16_t y = 0; y < pageHeight; y++) {
+        for (uint16_t x = 0; x < pageWidth; x++) {
+          const uint8_t pv = getPixelValue(x, y);
+          if (pv == 1 || pv == 2) {
+            renderer.drawPixel(x, y, false);
+          }
+        }
+      }
+      renderer.copyGrayscaleMsbBuffers();
+
+      const unsigned char* diffLut = (SETTINGS.grayRefreshMode == CrossPointSettings::GRAY_REFRESH_XFAST)
+                                         ? lut_xfast
+                                         : nullptr;
+      renderer.displayGrayBuffer(diffLut);
     }
-    renderer.copyGrayscaleMsbBuffers();
 
-    // Display grayscale overlay
-    renderer.displayGrayBuffer();
-
-    // Pass 4: Re-render BW to framebuffer (restore for next frame, instead of restoreBwBuffer)
+    // Re-render BW to framebuffer (restores display state for next frame / next BW page turn)
     renderer.clearScreen();
     for (uint16_t y = 0; y < pageHeight; y++) {
       for (uint16_t x = 0; x < pageWidth; x++) {
@@ -277,13 +325,12 @@ void XtcReaderActivity::renderPage() {
         }
       }
     }
-
-    // Cleanup grayscale buffers with current frame buffer
     renderer.cleanupGrayscaleWithFrameBuffer();
 
     free(pageBuffer);
 
-    LOG_DBG("XTR", "Rendered page %lu/%lu (2-bit grayscale)", currentPage + 1, xtc->getPageCount());
+    LOG_DBG("XTR", "Rendered page %lu/%lu (2-bit %s)", currentPage + 1, xtc->getPageCount(),
+            useFactory ? "factory" : "differential");
     return;
   } else {
     // 1-bit mode: 8 pixels per byte, MSB first
