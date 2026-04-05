@@ -718,13 +718,26 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   fcm->logStats("bw_render");
   const auto tBwRender = millis();
 
-  const bool useFactoryGray = SETTINGS.textAntiAliasing && SETTINGS.factoryLutImages && page->hasImages();
+  const bool isImagePage = page->hasImages();
+  const bool useFactoryGray = SETTINGS.textAntiAliasing && SETTINGS.factoryLutImages && isImagePage;
 
-  if (!useFactoryGray) {
-    // Original mode: display BW first, then apply differential gray AA
+  if (useFactoryGray) {
+    // Factory gray mode: skip BW display entirely — factory LUT drives pixels absolutely
+  } else if (isImagePage && SETTINGS.textAntiAliasing) {
+    // Upstream behavior: double FAST_REFRESH for image+AA pages to avoid ghosting
+    int16_t imgX, imgY, imgW, imgH;
+    if (page->getImageBoundingBox(imgX, imgY, imgW, imgH)) {
+      renderer.fillRect(imgX + orientedMarginLeft, imgY + orientedMarginTop, imgW, imgH, false);
+      renderer.displayBuffer(HalDisplay::FAST_REFRESH);
+      page->render(renderer, SETTINGS.getReaderFontId(), orientedMarginLeft, orientedMarginTop);
+      renderer.displayBuffer(HalDisplay::FAST_REFRESH);
+    } else {
+      renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+    }
+  } else {
+    // Text-only AA or no AA: BW display with refresh cadence
     ReaderUtils::displayWithRefreshCycle(renderer, pagesUntilFullRefresh);
   }
-  // Factory gray mode: skip BW display entirely — factory LUT drives pixels absolutely
   const auto tDisplay = millis();
 
   // Save bw buffer to reset buffer state after grayscale data sync
