@@ -253,6 +253,7 @@ void HomeActivity::onExit() {
   Activity::onExit();
 
   freeCoverBuffer();
+  invalidateCarouselCache();
   freeCarouselFrames();
 }
 
