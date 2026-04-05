@@ -206,6 +206,9 @@ class CrossPointSettings {
   uint8_t fileSortDirection = SORT_ASC;
   // Image rendering mode in EPUB reader
   uint8_t imageRendering = IMAGES_DISPLAY;
+  // Use factory fast LUT for 2-bit grayscale pages (XTC and EPUB with AA).
+  // 0 = original differential (no flash), 1 = factory fast (black flash, better quality)
+  uint8_t factoryLutImages = 0;
 
   ~CrossPointSettings() = default;
 

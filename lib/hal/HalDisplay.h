@@ -47,8 +47,16 @@ class HalDisplay {
   void copyGrayscaleMsbBuffers(const uint8_t* msbBuffer);
   void cleanupGrayscaleBuffers(const uint8_t* bwBuffer);
 
-  void displayGrayBuffer(bool turnOffScreen = false);
+  void displayGrayBuffer(bool turnOffScreen = false, const unsigned char* lut = nullptr, bool factoryMode = false);
+
+  // Runtime geometry passthrough
+  uint16_t getDisplayWidth() const;
+  uint16_t getDisplayHeight() const;
+  uint16_t getDisplayWidthBytes() const;
+  uint32_t getBufferSize() const;
 
  private:
   EInkDisplay einkDisplay;
 };
+
+extern HalDisplay display;

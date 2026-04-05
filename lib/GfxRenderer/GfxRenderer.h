@@ -18,7 +18,13 @@ enum Color : uint8_t { Clear = 0x00, White = 0x01, LightGray = 0x05, DarkGray = 
 
 class GfxRenderer {
  public:
-  enum RenderMode { BW, GRAYSCALE_LSB, GRAYSCALE_MSB };
+  enum RenderMode {
+    BW,             // 1-bit black/white
+    GRAYSCALE_LSB,  // Differential gray: mark pixels for LSB plane (clearScreen(0x00) + drawPixel(false))
+    GRAYSCALE_MSB,  // Differential gray: mark pixels for MSB plane (clearScreen(0x00) + drawPixel(false))
+    GRAY2_LSB,      // Factory absolute gray: encode BW RAM = bit0 (clearScreen(0xFF) + drawPixel(true))
+    GRAY2_MSB,      // Factory absolute gray: encode RED RAM = bit1 (clearScreen(0xFF) + drawPixel(true))
+  };
 
   // Logical screen orientation from the perspective of callers
   enum Orientation {
@@ -30,16 +36,17 @@ class GfxRenderer {
 
  private:
   static constexpr size_t BW_BUFFER_CHUNK_SIZE = 8000;  // 8KB chunks to allow for non-contiguous memory
-  static constexpr size_t BW_BUFFER_NUM_CHUNKS = HalDisplay::BUFFER_SIZE / BW_BUFFER_CHUNK_SIZE;
-  static_assert(BW_BUFFER_CHUNK_SIZE * BW_BUFFER_NUM_CHUNKS == HalDisplay::BUFFER_SIZE,
-                "BW buffer chunking does not line up with display buffer size");
 
   HalDisplay& display;
   RenderMode renderMode;
   Orientation orientation;
   bool fadingFix;
   uint8_t* frameBuffer = nullptr;
-  uint8_t* bwBufferChunks[BW_BUFFER_NUM_CHUNKS] = {nullptr};
+  uint16_t panelWidth = HalDisplay::DISPLAY_WIDTH;
+  uint16_t panelHeight = HalDisplay::DISPLAY_HEIGHT;
+  uint16_t panelWidthBytes = HalDisplay::DISPLAY_WIDTH_BYTES;
+  uint32_t frameBufferSize = HalDisplay::BUFFER_SIZE;
+  std::vector<uint8_t*> bwBufferChunks;
   std::map<int, EpdFontFamily> fontMap;
 
   // Mutable because drawText() is const but needs to delegate scan-mode
@@ -146,7 +153,7 @@ class GfxRenderer {
   RenderMode getRenderMode() const { return renderMode; }
   void copyGrayscaleLsbBuffers() const;
   void copyGrayscaleMsbBuffers() const;
-  void displayGrayBuffer() const;
+  void displayGrayBuffer(const unsigned char* lut = nullptr, bool factoryMode = false) const;
   bool storeBwBuffer();    // Returns true if buffer was stored successfully
   void restoreBwBuffer();  // Restore and free the stored buffer
   void cleanupGrayscaleWithFrameBuffer() const;
@@ -156,5 +163,5 @@ class GfxRenderer {
 
   // Low level functions
   uint8_t* getFrameBuffer() const;
-  static size_t getBufferSize();
+  size_t getBufferSize() const;
 };
