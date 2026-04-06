@@ -8,10 +8,10 @@
     :root {
       --bg: #111;
       --surface: #1c1c1c;
-      --border: #333;
+      --border: #2e2e2e;
       --accent: #e8e8e8;
-      --muted: #666;
-      --text: #ccc;
+      --muted: #555;
+      --text: #bbb;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -24,89 +24,71 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 48px 20px 64px;
+      padding: 40px 20px 60px;
     }
 
     header {
       text-align: center;
-      margin-bottom: 36px;
+      margin-bottom: 28px;
     }
 
     h1 {
-      font-size: 1.35rem;
+      font-size: 1.25rem;
       font-weight: 600;
       color: var(--accent);
-      letter-spacing: -0.4px;
-      margin-bottom: 6px;
+      letter-spacing: -0.3px;
+      margin-bottom: 5px;
     }
 
     .subtitle {
-      font-size: 0.82rem;
+      font-size: 0.78rem;
       color: var(--muted);
-      line-height: 1.5;
     }
 
+    /* ── Drop zone ─────────────────────────────── */
     .drop-zone {
       width: 100%;
-      max-width: 420px;
-      height: 150px;
+      max-width: 560px;
+      height: 120px;
       border: 1.5px dashed var(--border);
       border-radius: 10px;
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
+      gap: 12px;
       cursor: pointer;
       transition: border-color 0.15s, background 0.15s;
-      gap: 10px;
-      margin-bottom: 20px;
-    }
-
-    .drop-zone:hover,
-    .drop-zone.over {
-      border-color: #888;
-      background: #181818;
-    }
-
-    .drop-zone svg {
-      width: 28px;
-      height: 28px;
-      stroke: var(--muted);
-    }
-
-    .drop-zone p {
-      font-size: 0.875rem;
+      margin-bottom: 16px;
       color: var(--muted);
+      font-size: 0.85rem;
     }
 
-    .drop-zone span {
-      font-size: 0.75rem;
-      color: #444;
+    .drop-zone:hover, .drop-zone.over {
+      border-color: #666;
+      background: #161616;
     }
 
+    .drop-zone svg { width: 22px; height: 22px; stroke: var(--muted); flex-shrink: 0; }
     #fileInput { display: none; }
 
+    /* ── Mode pills ────────────────────────────── */
     .options {
       display: flex;
       align-items: center;
       gap: 6px;
-      margin-bottom: 28px;
+      margin-bottom: 24px;
     }
 
-    .options label {
-      font-size: 0.78rem;
-      color: var(--muted);
-      margin-right: 4px;
-    }
+    .options label { font-size: 0.75rem; color: var(--muted); margin-right: 2px; }
 
     .pill {
-      padding: 5px 14px;
+      padding: 4px 14px;
       border-radius: 20px;
       border: 1px solid var(--border);
       background: none;
       color: var(--muted);
       cursor: pointer;
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       transition: all 0.12s;
     }
 
@@ -117,40 +99,103 @@
       font-weight: 600;
     }
 
-    .previews {
+    /* ── Editor row ────────────────────────────── */
+    .editor-row {
       display: none;
-      gap: 24px;
-      margin-bottom: 28px;
+      gap: 28px;
+      align-items: flex-start;
+      margin-bottom: 24px;
       flex-wrap: wrap;
       justify-content: center;
     }
 
-    .previews.visible { display: flex; }
+    .editor-row.visible { display: flex; }
 
-    .preview-box {
+    /* ── Source image with crop overlay ─────────── */
+    .source-wrap {
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 8px;
     }
 
-    .preview-label {
-      font-size: 0.7rem;
+    .source-frame {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: crosshair;
+      flex-shrink: 0;
+      /* size set by JS */
+    }
+
+    #sourceCanvas {
+      display: block;
+      /* size set by JS */
+    }
+
+    /* Crop overlay: the 480×800 selection box */
+    #cropBox {
+      position: absolute;
+      top: 0;
+      left: 0;
+      /* box-shadow darkens everything outside the box */
+      box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.52);
+      border: 1.5px solid rgba(255,255,255,0.85);
+      outline: 1px solid rgba(0,0,0,0.4);
+      cursor: move;
+      user-select: none;
+      touch-action: none;
+    }
+
+    /* Corner handles */
+    #cropBox::before, #cropBox::after {
+      content: '';
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-color: rgba(255,255,255,0.9);
+      border-style: solid;
+    }
+
+    #cropBox::before {
+      top: -1px; left: -1px;
+      border-width: 2px 0 0 2px;
+    }
+
+    #cropBox::after {
+      bottom: -1px; right: -1px;
+      border-width: 0 2px 2px 0;
+    }
+
+    /* ── Preview ───────────────────────────────── */
+    .preview-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .panel-label {
+      font-size: 0.68rem;
       color: var(--muted);
       text-transform: uppercase;
-      letter-spacing: 0.6px;
+      letter-spacing: 0.7px;
     }
 
-    canvas {
+    #previewCanvas {
       border: 1px solid var(--border);
-      border-radius: 4px;
-      image-rendering: pixelated;
+      border-radius: 6px;
+      image-rendering: auto;
       display: block;
+      width: 240px;
+      height: 400px;
     }
 
+    /* ── Download ──────────────────────────────── */
     .download-btn {
       display: none;
-      padding: 11px 36px;
+      padding: 10px 36px;
       background: var(--accent);
       color: #111;
       border: none;
@@ -159,270 +204,368 @@
       font-weight: 600;
       cursor: pointer;
       transition: opacity 0.12s;
+      margin-bottom: 20px;
     }
 
     .download-btn:hover { opacity: 0.82; }
     .download-btn.visible { display: block; }
 
     footer {
-      margin-top: 28px;
-      font-size: 0.73rem;
-      color: #444;
+      font-size: 0.7rem;
+      color: #3a3a3a;
       text-align: center;
-      line-height: 1.8;
+      line-height: 1.9;
     }
 
     footer code {
-      background: #1c1c1c;
-      border: 1px solid #2a2a2a;
+      background: #1a1a1a;
+      border: 1px solid #272727;
       border-radius: 3px;
       padding: 1px 5px;
-      font-size: 0.7rem;
-      color: #888;
+      font-size: 0.68rem;
+      color: #555;
     }
   </style>
 </head>
 <body>
-  <header>
-    <h1>CrossPoint Sleep Screen Converter</h1>
-    <p class="subtitle">
-      Converts any image to a native 480×800 PXC file for CrossPoint sleep screens<br>
-      4-level grayscale · Floyd-Steinberg dithering · factory LUT quality mode
-    </p>
-  </header>
 
-  <div class="drop-zone" id="dropZone">
-    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12M12 16.5V3"/>
-    </svg>
-    <p>Drop image here or click to browse</p>
-    <span>JPG, PNG, WEBP, GIF…</span>
-    <input type="file" id="fileInput" accept="image/*">
-  </div>
+<header>
+  <h1>CrossPoint Sleep Screen Converter</h1>
+  <p class="subtitle">480×800 · 4-level grayscale · Floyd-Steinberg · factory LUT quality</p>
+</header>
 
-  <div class="options">
-    <label>Scale:</label>
-    <button class="pill" id="fitBtn" data-mode="fit">Fit</button>
-    <button class="pill active" id="cropBtn" data-mode="crop">Crop</button>
-  </div>
+<div class="drop-zone" id="dropZone">
+  <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12M12 16.5V3"/>
+  </svg>
+  Drop image here or click to browse
+  <input type="file" id="fileInput" accept="image/*">
+</div>
 
-  <div class="previews" id="previews">
-    <div class="preview-box">
-      <span class="preview-label">Original</span>
-      <canvas id="originalCanvas"></canvas>
-    </div>
-    <div class="preview-box">
-      <span class="preview-label">Converted</span>
-      <canvas id="convertedCanvas"></canvas>
+<div class="options">
+  <label>Scale:</label>
+  <button class="pill" id="fitBtn" data-mode="fit">Fit</button>
+  <button class="pill active" id="cropBtn" data-mode="crop">Crop</button>
+</div>
+
+<div class="editor-row" id="editorRow">
+  <div class="source-wrap">
+    <span class="panel-label">Source — drag to reposition</span>
+    <div class="source-frame" id="sourceFrame">
+      <canvas id="sourceCanvas"></canvas>
+      <div id="cropBox"></div>
     </div>
   </div>
 
-  <button class="download-btn" id="downloadBtn">Download .pxc</button>
+  <div class="preview-wrap">
+    <span class="panel-label">Preview</span>
+    <!-- internal resolution is 480×800, CSS scales it to 240×400 -->
+    <canvas id="previewCanvas" width="480" height="800"></canvas>
+  </div>
+</div>
 
-  <footer>
-    Place file in <code>/.sleep/</code> or as <code>/sleep.pxc</code> on SD card<br>
-    480×800 px · 2 bits/pixel · ~96 KB per file
-  </footer>
+<button class="download-btn" id="downloadBtn">Download .pxc</button>
 
-  <!-- off-screen full-res work canvas -->
-  <canvas id="workCanvas" style="display:none"></canvas>
+<footer>
+  Place file in <code>/.sleep/</code> or as <code>/sleep.pxc</code> on SD card<br>
+  480×800 px · 2 bits/pixel · ~96 KB per file
+</footer>
 
-  <script>
-    // ─── Constants ────────────────────────────────────────────────────────────
-    const TARGET_W = 480;
-    const TARGET_H = 800;
-    const PREVIEW_W = 180;   // preview at 37.5 %
-    const PREVIEW_H = 300;
+<!-- full-res off-screen work canvas -->
+<canvas id="workCanvas" width="480" height="800" style="display:none"></canvas>
 
-    // Gray level reference values for error diffusion — matches CrossPoint
-    // factory LUT quality mode thresholds (evenly-spaced 0/85/170/255).
-    const GRAY_REF = [0, 85, 170, 255]; // indexed by quantized level 0–3
+<script>
+// ─── Constants ──────────────────────────────────────────────────────────────
+const TARGET_W = 480;
+const TARGET_H = 800;
 
-    // Display colours for the preview canvas (what the e-ink levels look like)
-    const GRAY_RGB = [0, 85, 170, 255];
+// Max display dimensions for the source image editor
+const MAX_EDITOR_W = 300;
+const MAX_EDITOR_H = 500;
 
-    // ─── State ────────────────────────────────────────────────────────────────
-    let mode = 'crop';
-    let currentFile = null;
-    let pxcBytes = null;
-    let outputName = 'sleep.pxc';
+// Gray level targets for error diffusion — evenly spaced, factory LUT quality
+const GRAY_REF  = [0, 85, 170, 255];   // reference values for dither error
+const GRAY_DISP = [0, 85, 170, 255];   // display RGB values for preview
 
-    // ─── DOM ──────────────────────────────────────────────────────────────────
-    const dropZone       = document.getElementById('dropZone');
-    const fileInput      = document.getElementById('fileInput');
-    const previews       = document.getElementById('previews');
-    const originalCanvas = document.getElementById('originalCanvas');
-    const convertedCanvas= document.getElementById('convertedCanvas');
-    const workCanvas     = document.getElementById('workCanvas');
-    const downloadBtn    = document.getElementById('downloadBtn');
+// ─── State ──────────────────────────────────────────────────────────────────
+let loadedImg    = null;
+let currentFile  = null;
+let pxcBytes     = null;
+let outputName   = 'sleep.pxc';
+let mode         = 'crop';
 
-    originalCanvas.width  = PREVIEW_W; originalCanvas.height  = PREVIEW_H;
-    convertedCanvas.width = PREVIEW_W; convertedCanvas.height = PREVIEW_H;
-    workCanvas.width = TARGET_W; workCanvas.height = TARGET_H;
+let displayScale = 1;   // source → editor canvas scale
+let workScale    = 1;   // source → 480×800 work canvas scale
+let dispImgW     = 0;
+let dispImgH     = 0;
+let boxW         = 0;   // crop box size in editor pixels
+let boxH         = 0;
+let boxX         = 0;   // crop box position in editor pixels
+let boxY         = 0;
 
-    // ─── Mode pills ───────────────────────────────────────────────────────────
-    document.querySelectorAll('.pill').forEach(btn => {
-      btn.addEventListener('click', () => {
-        mode = btn.dataset.mode;
-        document.querySelectorAll('.pill').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        if (currentFile) process(currentFile);
-      });
-    });
+let isDragging   = false;
+let dragStartX   = 0;
+let dragStartY   = 0;
+let dragStartBX  = 0;
+let dragStartBY  = 0;
+let convertTimer = null;
 
-    // ─── Drop zone ────────────────────────────────────────────────────────────
-    dropZone.addEventListener('click', () => fileInput.click());
-    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('over'); });
-    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
-    dropZone.addEventListener('drop', e => {
-      e.preventDefault();
-      dropZone.classList.remove('over');
-      const f = e.dataTransfer.files[0];
-      if (f && f.type.startsWith('image/')) load(f);
-    });
-    fileInput.addEventListener('change', () => { if (fileInput.files[0]) load(fileInput.files[0]); });
+// ─── DOM ────────────────────────────────────────────────────────────────────
+const dropZone     = document.getElementById('dropZone');
+const fileInput    = document.getElementById('fileInput');
+const editorRow    = document.getElementById('editorRow');
+const sourceFrame  = document.getElementById('sourceFrame');
+const sourceCanvas = document.getElementById('sourceCanvas');
+const cropBox      = document.getElementById('cropBox');
+const previewCanvas= document.getElementById('previewCanvas');
+const workCanvas   = document.getElementById('workCanvas');
+const downloadBtn  = document.getElementById('downloadBtn');
 
-    function load(file) {
-      currentFile = file;
-      outputName = file.name.replace(/\.[^.]+$/, '') + '.pxc';
-      process(file);
-    }
+// ─── Mode pills ─────────────────────────────────────────────────────────────
+document.querySelectorAll('.pill').forEach(btn => {
+  btn.addEventListener('click', () => {
+    mode = btn.dataset.mode;
+    document.querySelectorAll('.pill').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    if (loadedImg) resetEditor();
+  });
+});
 
-    // ─── Main pipeline ────────────────────────────────────────────────────────
-    function process(file) {
-      const reader = new FileReader();
-      reader.onload = e => {
-        const img = new Image();
-        img.onload = () => { scaleToWork(img); convert(); };
-        img.src = e.target.result;
-      };
-      reader.readAsDataURL(file);
-    }
+// ─── Drop / file pick ───────────────────────────────────────────────────────
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('over');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('image/')) loadFile(f);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
 
-    function scaleToWork(img) {
-      const ctx = workCanvas.getContext('2d');
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, TARGET_W, TARGET_H);
+function loadFile(file) {
+  currentFile = file;
+  outputName  = file.name.replace(/\.[^.]+$/, '') + '.pxc';
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => { loadedImg = img; resetEditor(); };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
 
-      const ir = img.naturalWidth / img.naturalHeight;
-      const sr = TARGET_W / TARGET_H;
-      let sx = 0, sy = 0, sw = img.naturalWidth, sh = img.naturalHeight;
-      let dx = 0, dy = 0, dw = TARGET_W, dh = TARGET_H;
+// ─── Editor setup ───────────────────────────────────────────────────────────
+function resetEditor() {
+  const srcW = loadedImg.naturalWidth;
+  const srcH = loadedImg.naturalHeight;
 
-      if (mode === 'crop') {
-        if (ir > sr) { const cw = sh * sr; sx = (sw - cw) / 2; sw = cw; }
-        else         { const ch = sw / sr; sy = (sh - ch) / 2; sh = ch; }
-      } else {
-        if (ir > sr) { dh = TARGET_W / ir; dy = (TARGET_H - dh) / 2; }
-        else         { dw = TARGET_H * ir; dx = (TARGET_W - dw) / 2; }
+  // Scale image to fit in editor area
+  displayScale = Math.min(MAX_EDITOR_W / srcW, MAX_EDITOR_H / srcH);
+  dispImgW = Math.round(srcW * displayScale);
+  dispImgH = Math.round(srcH * displayScale);
+
+  // Work scale: fill (crop) or fit
+  if (mode === 'crop') {
+    workScale = Math.max(TARGET_W / srcW, TARGET_H / srcH);
+  } else {
+    workScale = Math.min(TARGET_W / srcW, TARGET_H / srcH);
+  }
+
+  // Crop box size in editor pixels (represents 480×800 in work space, mapped to display)
+  // In source pixels: TARGET_W/workScale × TARGET_H/workScale
+  // In editor pixels: × displayScale
+  boxW = (TARGET_W / workScale) * displayScale;
+  boxH = (TARGET_H / workScale) * displayScale;
+
+  // Clamp to editor image bounds (should never exceed in fill mode)
+  boxW = Math.min(boxW, dispImgW);
+  boxH = Math.min(boxH, dispImgH);
+
+  // Center the crop box
+  boxX = (dispImgW - boxW) / 2;
+  boxY = (dispImgH - boxH) / 2;
+
+  // Update source canvas
+  sourceCanvas.width  = dispImgW;
+  sourceCanvas.height = dispImgH;
+  sourceCanvas.getContext('2d').drawImage(loadedImg, 0, 0, dispImgW, dispImgH);
+
+  // Size the frame to match the image
+  sourceFrame.style.width  = dispImgW + 'px';
+  sourceFrame.style.height = dispImgH + 'px';
+
+  // Apply crop box
+  applyCropBox();
+
+  // Show editor and convert
+  editorRow.classList.add('visible');
+  scheduleConvert(0);
+}
+
+function applyCropBox() {
+  // Clamp position to image bounds
+  boxX = Math.max(0, Math.min(dispImgW - boxW, boxX));
+  boxY = Math.max(0, Math.min(dispImgH - boxH, boxY));
+
+  cropBox.style.left   = boxX + 'px';
+  cropBox.style.top    = boxY + 'px';
+  cropBox.style.width  = boxW + 'px';
+  cropBox.style.height = boxH + 'px';
+  cropBox.style.cursor = mode === 'crop' ? 'move' : 'default';
+}
+
+// ─── Drag ────────────────────────────────────────────────────────────────────
+cropBox.addEventListener('mousedown',  onDragStart);
+cropBox.addEventListener('touchstart', onDragStart, { passive: false });
+window.addEventListener('mousemove',   onDragMove);
+window.addEventListener('touchmove',   onDragMove, { passive: false });
+window.addEventListener('mouseup',     onDragEnd);
+window.addEventListener('touchend',    onDragEnd);
+
+function clientXY(e) {
+  return e.touches
+    ? { x: e.touches[0].clientX, y: e.touches[0].clientY }
+    : { x: e.clientX, y: e.clientY };
+}
+
+function onDragStart(e) {
+  if (mode !== 'crop') return;
+  e.preventDefault();
+  isDragging   = true;
+  const p      = clientXY(e);
+  dragStartX   = p.x;
+  dragStartY   = p.y;
+  dragStartBX  = boxX;
+  dragStartBY  = boxY;
+}
+
+function onDragMove(e) {
+  if (!isDragging) return;
+  e.preventDefault();
+  const p  = clientXY(e);
+  const dx = p.x - dragStartX;
+  const dy = p.y - dragStartY;
+  boxX = dragStartBX + dx;
+  boxY = dragStartBY + dy;
+  applyCropBox();
+  scheduleConvert(120);
+}
+
+function onDragEnd() {
+  if (!isDragging) return;
+  isDragging = false;
+  scheduleConvert(0);
+}
+
+// ─── Conversion ─────────────────────────────────────────────────────────────
+function scheduleConvert(delay) {
+  clearTimeout(convertTimer);
+  convertTimer = setTimeout(convert, delay);
+}
+
+// Luminance — ITU-R BT.601, same as Bitmap.cpp
+function lum(r, g, b) { return (77 * r + 150 * g + 29 * b) >> 8; }
+
+// Quantise to 4 levels — midpoint thresholds for factory LUT quality
+// Thresholds: 43 / 128 / 213  (midpoints of 0, 85, 170, 255)
+function quantize(v) {
+  if (v < 43)  return 0;   // black
+  if (v < 128) return 1;   // dark gray
+  if (v < 213) return 2;   // light gray
+  return 3;                 // white
+}
+
+function convert() {
+  if (!loadedImg) return;
+
+  const srcW = loadedImg.naturalWidth;
+  const srcH = loadedImg.naturalHeight;
+  const ctx  = workCanvas.getContext('2d');
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, TARGET_W, TARGET_H);
+
+  if (mode === 'fit') {
+    const fitScale = Math.min(TARGET_W / srcW, TARGET_H / srcH);
+    const fw = srcW * fitScale;
+    const fh = srcH * fitScale;
+    ctx.drawImage(loadedImg, (TARGET_W - fw) / 2, (TARGET_H - fh) / 2, fw, fh);
+  } else {
+    // Crop mode: draw image at workScale offset by crop box position
+    // k converts editor-pixel offset → work-canvas-pixel offset
+    const k  = workScale / displayScale;
+    ctx.drawImage(loadedImg, -boxX * k, -boxY * k, srcW * workScale, srcH * workScale);
+  }
+
+  // ── Floyd-Steinberg dithering ──────────────────────────────────────────
+  const px  = ctx.getImageData(0, 0, TARGET_W, TARGET_H).data;
+  const buf = new Float32Array(TARGET_W * TARGET_H);
+  for (let i = 0; i < TARGET_W * TARGET_H; i++) {
+    buf[i] = lum(px[i * 4], px[i * 4 + 1], px[i * 4 + 2]);
+  }
+
+  const q = new Uint8Array(TARGET_W * TARGET_H);
+  for (let y = 0; y < TARGET_H; y++) {
+    for (let x = 0; x < TARGET_W; x++) {
+      const i  = y * TARGET_W + x;
+      const v  = Math.max(0, Math.min(255, buf[i]));
+      const qv = quantize(v);
+      q[i]     = qv;
+      const err = v - GRAY_REF[qv];
+      if (x + 1 < TARGET_W)
+        buf[i + 1]             += err * 7 / 16;
+      if (y + 1 < TARGET_H) {
+        if (x > 0)
+          buf[i + TARGET_W - 1] += err * 3 / 16;
+        buf[i + TARGET_W]        += err * 5 / 16;
+        if (x + 1 < TARGET_W)
+          buf[i + TARGET_W + 1]  += err * 1 / 16;
       }
-
-      ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
-
-      // Show original scaled preview
-      originalCanvas.getContext('2d').drawImage(workCanvas, 0, 0, PREVIEW_W, PREVIEW_H);
     }
+  }
 
-    // ─── Luminance (ITU-R BT.601, same as GfxRenderer Bitmap.cpp) ─────────────
-    function lum(r, g, b) { return (77 * r + 150 * g + 29 * b) >> 8; }
+  // ── Draw preview at full 480×800 resolution ────────────────────────────
+  // (Canvas is 480×800, CSS shrinks it to 240×400 for display — crisp.)
+  const prevCtx = previewCanvas.getContext('2d');
+  const id      = prevCtx.createImageData(TARGET_W, TARGET_H);
+  for (let i = 0; i < TARGET_W * TARGET_H; i++) {
+    const g = GRAY_DISP[q[i]];
+    id.data[i * 4]     = g;
+    id.data[i * 4 + 1] = g;
+    id.data[i * 4 + 2] = g;
+    id.data[i * 4 + 3] = 255;
+  }
+  prevCtx.putImageData(id, 0, 0);
 
-    // ─── Quantize to 4 levels — midpoint thresholds for factory LUT quality ───
-    // Thresholds: 43 / 128 / 213  (midpoints between 0, 85, 170, 255)
-    function quantize(v) {
-      if (v < 43)  return 0;  // black
-      if (v < 128) return 1;  // dark gray
-      if (v < 213) return 2;  // light gray
-      return 3;               // white
+  // ── Encode PXC ────────────────────────────────────────────────────────
+  pxcBytes = encodePxc(q, TARGET_W, TARGET_H);
+  downloadBtn.classList.add('visible');
+}
+
+// ─── PXC encoder ────────────────────────────────────────────────────────────
+// Format: uint16_t width (LE), uint16_t height (LE), 2bpp pixels MSB-first
+function encodePxc(q, w, h) {
+  const bpr = Math.ceil(w / 4);
+  const buf = new Uint8Array(4 + bpr * h);
+  buf[0] = w & 0xFF;  buf[1] = (w >> 8) & 0xFF;
+  buf[2] = h & 0xFF;  buf[3] = (h >> 8) & 0xFF;
+  for (let row = 0; row < h; row++) {
+    for (let col = 0; col < w; col++) {
+      const pv = q[row * w + col] & 0x03;
+      buf[4 + row * bpr + (col >> 2)] |= pv << (6 - (col & 3) * 2);
     }
+  }
+  return buf;
+}
 
-    // ─── Floyd-Steinberg dithering ────────────────────────────────────────────
-    function dither(lumBuf) {
-      // lumBuf: Float32Array [0..255], length TARGET_W * TARGET_H
-      // returns Uint8Array of quantized values 0–3
-      const out = new Uint8Array(TARGET_W * TARGET_H);
-
-      for (let y = 0; y < TARGET_H; y++) {
-        for (let x = 0; x < TARGET_W; x++) {
-          const i = y * TARGET_W + x;
-          const v = Math.max(0, Math.min(255, lumBuf[i]));
-          const qv = quantize(v);
-          out[i] = qv;
-
-          const err = v - GRAY_REF[qv];
-          if (x + 1 < TARGET_W)
-            lumBuf[i + 1]           += err * 7 / 16;
-          if (y + 1 < TARGET_H) {
-            if (x > 0)
-              lumBuf[i + TARGET_W - 1] += err * 3 / 16;
-            lumBuf[i + TARGET_W]       += err * 5 / 16;
-            if (x + 1 < TARGET_W)
-              lumBuf[i + TARGET_W + 1] += err * 1 / 16;
-          }
-        }
-      }
-      return out;
-    }
-
-    // ─── Encode to PXC binary ─────────────────────────────────────────────────
-    // Format: uint16_t width (LE), uint16_t height (LE), then 2bpp pixels
-    // 4 pixels per byte, MSB-first (pixel 0 at bits [7:6], pixel 3 at bits [1:0])
-    function encodePxc(q, w, h) {
-      const bytesPerRow = Math.ceil(w / 4);
-      const buf = new Uint8Array(4 + bytesPerRow * h);
-      buf[0] = w & 0xFF; buf[1] = (w >> 8) & 0xFF;
-      buf[2] = h & 0xFF; buf[3] = (h >> 8) & 0xFF;
-      for (let row = 0; row < h; row++) {
-        for (let col = 0; col < w; col++) {
-          const pv = q[row * w + col] & 0x03;
-          const bi = 4 + row * bytesPerRow + (col >> 2);
-          buf[bi] |= pv << (6 - (col & 3) * 2);
-        }
-      }
-      return buf;
-    }
-
-    function convert() {
-      const ctx = workCanvas.getContext('2d');
-      const px = ctx.getImageData(0, 0, TARGET_W, TARGET_H).data;
-
-      // Build luminance buffer
-      const lumBuf = new Float32Array(TARGET_W * TARGET_H);
-      for (let i = 0; i < TARGET_W * TARGET_H; i++) {
-        lumBuf[i] = lum(px[i * 4], px[i * 4 + 1], px[i * 4 + 2]);
-      }
-
-      // Dither
-      const q = dither(lumBuf);
-
-      // Draw converted preview
-      const full = document.createElement('canvas');
-      full.width = TARGET_W; full.height = TARGET_H;
-      const fctx = full.getContext('2d');
-      const id = fctx.createImageData(TARGET_W, TARGET_H);
-      for (let i = 0; i < TARGET_W * TARGET_H; i++) {
-        const g = GRAY_RGB[q[i]];
-        id.data[i * 4]     = g;
-        id.data[i * 4 + 1] = g;
-        id.data[i * 4 + 2] = g;
-        id.data[i * 4 + 3] = 255;
-      }
-      fctx.putImageData(id, 0, 0);
-      convertedCanvas.getContext('2d').drawImage(full, 0, 0, PREVIEW_W, PREVIEW_H);
-
-      // Encode & enable download
-      pxcBytes = encodePxc(q, TARGET_W, TARGET_H);
-      previews.classList.add('visible');
-      downloadBtn.classList.add('visible');
-    }
-
-    // ─── Download ─────────────────────────────────────────────────────────────
-    downloadBtn.addEventListener('click', () => {
-      if (!pxcBytes) return;
-      const url = URL.createObjectURL(new Blob([pxcBytes], { type: 'application/octet-stream' }));
-      const a = document.createElement('a');
-      a.href = url; a.download = outputName; a.click();
-      URL.revokeObjectURL(url);
-    });
-  </script>
+// ─── Download ────────────────────────────────────────────────────────────────
+downloadBtn.addEventListener('click', () => {
+  if (!pxcBytes) return;
+  const url = URL.createObjectURL(new Blob([pxcBytes], { type: 'application/octet-stream' }));
+  const a   = document.createElement('a');
+  a.href = url; a.download = outputName; a.click();
+  URL.revokeObjectURL(url);
+});
+</script>
 </body>
 </html>
