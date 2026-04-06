@@ -1182,13 +1182,13 @@ void GfxRenderer::renderGrayscale(GrayscaleMode mode, void (*renderFn)(GfxRender
     // Without this, particles stranded at intermediate grays may not complete their transition:
     // from a known-white state only downward transitions are needed, which both LUTs handle cleanly.
     //
-    // FactoryQuality uses HALF_REFRESH (non-differential, loads its own LUT) to guarantee true white
-    // regardless of BW RAM sync state. FAST_REFRESH is differential — if BW RAM is desynchronised
-    // after a prior grayscale operation, it skips pixels it believes are already white but aren't,
-    // leaving them at intermediate grays which the quality LUT then renders darker than expected.
-    // FactoryFast keeps FAST_REFRESH since it is used in the reader where minimising flash is priority.
+    // HALF_REFRESH (CTRL1_BYPASS_RED) guarantees true white regardless of RED RAM sync state.
+    // FAST_REFRESH is differential against RED RAM — after any prior grayscale operation the RED RAM
+    // may be stale (e.g. chapter menu rendered while display shows gray), so pixels the controller
+    // believes are already white may physically be at gray or chapter-menu positions and won't be
+    // driven to white, corrupting the subsequent gray render.
     clearScreen();
-    displayBuffer(mode == GrayscaleMode::FactoryQuality ? HalDisplay::HALF_REFRESH : HalDisplay::FAST_REFRESH);
+    displayBuffer(HalDisplay::HALF_REFRESH);
   }
 
   const RenderMode lsbMode = (mode == GrayscaleMode::Differential) ? GRAYSCALE_LSB : GRAY2_LSB;
