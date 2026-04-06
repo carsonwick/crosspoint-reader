@@ -407,7 +407,19 @@ const MAX_EDITOR_W = 340;
 const MAX_EDITOR_H = 520;
 const SNAP_THRESHOLD = 9;
 
-const GRAY_REF  = [0, 85, 170, 255];
+// Pre-computed sRGB → linear LUT (avoids Math.pow per pixel)
+const SRGB_TO_LINEAR = new Float32Array(256);
+for (let i = 0; i < 256; i++) {
+  const s = i / 255;
+  SRGB_TO_LINEAR[i] = (s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4)) * 255;
+}
+
+// Gray reference values in LINEAR light — these are the linear equivalents of
+// sRGB [0, 85, 170, 255], i.e. what the display outputs in linear reflectance.
+// Error diffusion must run in linear space so errors are perceptually uniform.
+const GRAY_REF  = [0, 23, 103, 255];
+
+// Preview display values — sRGB encoded, for the monitor
 const GRAY_DISP = [0, 85, 170, 255];
 
 let loadedImg    = null;
@@ -592,12 +604,16 @@ function scheduleConvert(delay) {
   convertTimer = setTimeout(convert, delay);
 }
 
-function lum(r, g, b) { return (77 * r + 150 * g + 29 * b) >> 8; }
+// BT.601 luminance in LINEAR light — weights applied after sRGB linearisation
+function lum(r, g, b) {
+  return 0.299 * SRGB_TO_LINEAR[r] + 0.587 * SRGB_TO_LINEAR[g] + 0.114 * SRGB_TO_LINEAR[b];
+}
 
+// Thresholds are midpoints of GRAY_REF linear values [0, 23, 103, 255]
 function quantize(v) {
-  if (v < 43)  return 0;
-  if (v < 128) return 1;
-  if (v < 213) return 2;
+  if (v < 12)  return 0;
+  if (v < 63)  return 1;
+  if (v < 179) return 2;
   return 3;
 }
 
@@ -630,7 +646,7 @@ function convert() {
   const px  = ctx.getImageData(0, 0, TARGET_W, TARGET_H).data;
   const buf = new Float32Array(TARGET_W * TARGET_H);
   for (let i = 0; i < TARGET_W * TARGET_H; i++)
-    buf[i] = lum(px[i*4], px[i*4+1], px[i*4+2]);
+    buf[i] = lum(px[i*4], px[i*4+1], px[i*4+2]);  // linear luminance 0–255
 
   const q = new Uint8Array(TARGET_W * TARGET_H);
   for (let y = 0; y < TARGET_H; y++) {
