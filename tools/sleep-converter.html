@@ -4,217 +4,153 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CrossPoint Sleep Screen Converter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #111;
-      --surface: #1c1c1c;
-      --border: #2e2e2e;
-      --accent: #e8e8e8;
-      --muted: #555;
-      --text: #bbb;
-      --snap: rgba(255, 180, 0, 0.85);
+      --bg:        #0d0d0f;
+      --panel:     #141416;
+      --surface:   #1c1c20;
+      --border:    #25252b;
+      --border2:   #2e2e36;
+      --accent:    #e8e8ea;
+      --accent-dim:#c8c8cc;
+      --text:      #e4e4e8;
+      --muted:     #5a5a68;
+      --muted2:    #3a3a46;
+      --snap:      rgba(251,191,36,0.9);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family: 'DM Sans', -apple-system, sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 40px 20px 60px;
-      gap: 0;
+      padding: 32px 24px 56px;
     }
 
+    /* ── Header ─────────────────────────────────── */
     header {
-      text-align: center;
-      margin-bottom: 28px;
+      width: 100%;
+      max-width: 860px;
+      margin-bottom: 24px;
     }
 
     h1 {
-      font-size: 1.25rem;
+      font-size: 1.15rem;
       font-weight: 600;
-      color: var(--accent);
-      letter-spacing: -0.3px;
-      margin-bottom: 5px;
+      color: var(--text);
+      letter-spacing: -0.2px;
+      margin-bottom: 4px;
     }
 
-    .subtitle { font-size: 0.78rem; color: var(--muted); }
+    .subtitle {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: 0.2px;
+    }
 
-    /* ── Drop zone ─────────────────────────────── */
+    /* ── App shell ────────────────────────────────── */
+    .app {
+      width: 100%;
+      max-width: 860px;
+      display: grid;
+      grid-template-columns: 1fr 272px;
+      grid-template-rows: auto 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+
+    /* ── Left column ─────────────────────────────── */
+    .left {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* ── Drop zone ─────────────────────────────────── */
     .drop-zone {
       width: 100%;
-      max-width: 560px;
-      height: 120px;
-      border: 1.5px dashed var(--border);
+      min-height: 140px;
+      border: 1.5px dashed var(--border2);
       border-radius: 10px;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 12px;
+      gap: 10px;
       cursor: pointer;
       transition: border-color 0.15s, background 0.15s;
-      margin-bottom: 20px;
       color: var(--muted);
       font-size: 0.85rem;
+      padding: 24px;
     }
-    .drop-zone:hover, .drop-zone.over { border-color: #666; background: #161616; }
-    .drop-zone svg { width: 22px; height: 22px; stroke: var(--muted); flex-shrink: 0; }
+    .drop-zone:hover, .drop-zone.over {
+      border-color: var(--accent);
+      background: rgba(59,130,246,0.04);
+      color: var(--text);
+    }
+    .drop-zone svg { width: 24px; height: 24px; stroke: currentColor; opacity: 0.7; }
+    .drop-zone small {
+      font-size: 0.72rem;
+      color: var(--muted2);
+      margin-top: -4px;
+    }
     #fileInput { display: none; }
 
-    /* ── Controls (pills + position picker) ─────── */
-    .controls {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 14px;
-      margin-bottom: 24px;
-    }
+    /* ── Source editor ────────────────────────────── */
+    .editor-section { display: none; }
+    .editor-section.visible { display: block; }
 
-    .scale-row {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .scale-row label { font-size: 0.75rem; color: var(--muted); margin-right: 2px; }
-
-    .pill {
-      padding: 4px 14px;
-      border-radius: 20px;
-      border: 1px solid var(--border);
-      background: none;
-      color: var(--muted);
-      cursor: pointer;
-      font-size: 0.78rem;
-      transition: all 0.12s;
-    }
-    .pill.active {
-      background: var(--accent);
-      color: #111;
-      border-color: var(--accent);
-      font-weight: 600;
-    }
-
-    /* ── Position picker ─────────────────────────── */
-    .position-row {
-      display: none;
-      align-items: center;
-      gap: 12px;
-    }
-    .position-row.visible { display: flex; }
-
-    .pos-row-label {
-      font-size: 0.75rem;
-      color: var(--muted);
-      white-space: nowrap;
-    }
-
-    .pos-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 30px);
-      grid-template-rows: repeat(3, 30px);
-      gap: 3px;
-    }
-
-    .pos-btn {
-      width: 30px;
-      height: 30px;
-      border: 1px solid var(--border);
-      background: none;
-      border-radius: 4px;
-      cursor: pointer;
-      position: relative;
-      transition: border-color 0.1s, background 0.1s;
-    }
-    .pos-btn:hover { border-color: #555; background: #181818; }
-
-    .pos-btn::after {
-      content: '';
-      position: absolute;
-      width: 6px;
-      height: 6px;
-      background: var(--muted);
-      border-radius: 1px;
-      transition: background 0.1s;
-    }
-
-    .pos-btn[data-pos="tl"]::after { top: 4px;  left: 4px; }
-    .pos-btn[data-pos="tc"]::after { top: 4px;  left: 50%; transform: translateX(-50%); }
-    .pos-btn[data-pos="tr"]::after { top: 4px;  right: 4px; }
-    .pos-btn[data-pos="ml"]::after { top: 50%;  left: 4px; transform: translateY(-50%); }
-    .pos-btn[data-pos="mc"]::after { top: 50%;  left: 50%; transform: translate(-50%,-50%); }
-    .pos-btn[data-pos="mr"]::after { top: 50%;  right: 4px; transform: translateY(-50%); }
-    .pos-btn[data-pos="bl"]::after { bottom: 4px; left: 4px; }
-    .pos-btn[data-pos="bc"]::after { bottom: 4px; left: 50%; transform: translateX(-50%); }
-    .pos-btn[data-pos="br"]::after { bottom: 4px; right: 4px; }
-
-    .pos-btn.active { border-color: var(--accent); background: rgba(232,232,232,0.08); }
-    .pos-btn.active::after { background: var(--accent); }
-
-    /* ── Editor row ────────────────────────────── */
-    .editor-row {
-      display: none;
-      gap: 28px;
-      align-items: flex-start;
-      margin-bottom: 24px;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-    .editor-row.visible { display: flex; }
-
-    .panel-col {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .panel-label {
+    .section-label {
       font-size: 0.68rem;
+      font-weight: 500;
       color: var(--muted);
       text-transform: uppercase;
-      letter-spacing: 0.7px;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
     }
 
-    /* ── Source frame ────────────────────────────── */
     .source-frame {
       position: relative;
       overflow: hidden;
       border: 1px solid var(--border);
-      border-radius: 6px;
-      flex-shrink: 0;
+      border-radius: 8px;
+      display: inline-block;
     }
 
     #sourceCanvas { display: block; }
 
     #cropBox {
       position: absolute;
-      box-shadow: 0 0 0 2000px rgba(0,0,0,0.52);
-      border: 1.5px solid rgba(255,255,255,0.85);
-      outline: 1px solid rgba(0,0,0,0.4);
+      box-shadow: 0 0 0 2000px rgba(0,0,0,0.55);
+      border: 1.5px solid rgba(255,255,255,0.8);
+      outline: 1px solid rgba(0,0,0,0.5);
       cursor: move;
       user-select: none;
       touch-action: none;
-      transition: border-color 0.1s, box-shadow 0.1s;
+      transition: border-color 0.1s;
     }
     #cropBox.snapped {
-      border-color: rgba(255,200,60,0.95);
-      box-shadow: 0 0 0 2000px rgba(0,0,0,0.52), inset 0 0 0 1px rgba(255,200,60,0.25);
+      border-color: rgba(251,191,36,0.95);
     }
     #cropBox::before, #cropBox::after {
       content: '';
       position: absolute;
       width: 10px; height: 10px;
-      border-color: rgba(255,255,255,0.9);
+      border-color: rgba(255,255,255,0.85);
       border-style: solid;
     }
     #cropBox::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
     #cropBox::after  { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
 
-    /* Snap guides */
     .snap-guide {
       position: absolute;
       pointer-events: none;
@@ -224,49 +160,156 @@
       z-index: 10;
     }
     .snap-guide.active { opacity: 1; }
-    #snapGuideH { height: 1px; left: 0; right: 0; top: 50%; margin-top: -0.5px; }
-    #snapGuideV { width: 1px; top: 0; bottom: 0; left: 50%; margin-left: -0.5px; }
+    #snapGuideH { height: 1px; left: 0; right: 0; top: 50%; margin-top: -.5px; }
+    #snapGuideV { width: 1px; top: 0; bottom: 0; left: 50%; margin-left: -.5px; }
 
-    /* ── Preview canvas ────────────────────────── */
-    #previewCanvas {
+    /* ── Right panel ────────────────────────────────── */
+    .right {
+      background: var(--panel);
       border: 1px solid var(--border);
-      border-radius: 6px;
-      image-rendering: auto;
-      display: block;
-      width: 240px;
-      height: 400px;
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
 
-    /* ── Download ──────────────────────────────── */
+    .panel-section {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .panel-section:last-child { border-bottom: none; }
+
+    .panel-heading {
+      font-size: 0.65rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1.1px;
+      margin-bottom: 10px;
+    }
+
+    /* ── Scale pills ────────────────────────────────── */
+    .pill-group {
+      display: flex;
+      gap: 6px;
+    }
+
+    .pill {
+      flex: 1;
+      padding: 6px 0;
+      border-radius: 6px;
+      border: 1px solid var(--border2);
+      background: var(--surface);
+      color: var(--muted);
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 500;
+      transition: all 0.12s;
+      text-align: center;
+    }
+    .pill:hover { border-color: #444; color: var(--text); }
+    .pill.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #111;
+      font-weight: 600;
+    }
+
+    /* ── Position picker ────────────────────────────── */
+    #posSection { display: none; }
+    #posSection.visible { display: block; }
+
+    .pos-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+    }
+
+    .pos-btn {
+      aspect-ratio: 1;
+      border: 1px solid var(--border2);
+      background: var(--surface);
+      border-radius: 5px;
+      cursor: pointer;
+      position: relative;
+      transition: border-color 0.1s, background 0.1s;
+    }
+    .pos-btn:hover { border-color: #444; background: #1f1f25; }
+    .pos-btn::after {
+      content: '';
+      position: absolute;
+      width: 6px; height: 6px;
+      background: var(--muted);
+      border-radius: 1px;
+      transition: background 0.1s;
+    }
+
+    .pos-btn[data-pos="tl"]::after { top: 5px;  left: 5px; }
+    .pos-btn[data-pos="tc"]::after { top: 5px;  left: 50%; transform: translateX(-50%); }
+    .pos-btn[data-pos="tr"]::after { top: 5px;  right: 5px; }
+    .pos-btn[data-pos="ml"]::after { top: 50%;  left: 5px; transform: translateY(-50%); }
+    .pos-btn[data-pos="mc"]::after { top: 50%;  left: 50%; transform: translate(-50%,-50%); }
+    .pos-btn[data-pos="mr"]::after { top: 50%;  right: 5px; transform: translateY(-50%); }
+    .pos-btn[data-pos="bl"]::after { bottom: 5px; left: 5px; }
+    .pos-btn[data-pos="bc"]::after { bottom: 5px; left: 50%; transform: translateX(-50%); }
+    .pos-btn[data-pos="br"]::after { bottom: 5px; right: 5px; }
+
+    .pos-btn.active { border-color: var(--accent); background: rgba(232,232,234,0.1); }
+    .pos-btn.active::after { background: var(--accent); }
+
+    /* ── Preview ────────────────────────────────────── */
+    #previewCanvas {
+      display: block;
+      width: 100%;
+      /* height computed to maintain 480:800 = 3:5 ratio */
+      aspect-ratio: 3 / 5;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      image-rendering: auto;
+    }
+
+    /* ── Download button ────────────────────────────── */
     .download-btn {
       display: none;
-      padding: 10px 36px;
+      width: 100%;
+      padding: 10px 0;
       background: var(--accent);
       color: #111;
       border: none;
       border-radius: 7px;
-      font-size: 0.9rem;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.88rem;
       font-weight: 600;
       cursor: pointer;
-      transition: opacity 0.12s;
-      margin-bottom: 20px;
+      transition: background 0.12s;
     }
-    .download-btn:hover { opacity: 0.82; }
+    .download-btn:hover { background: var(--accent-dim); }
     .download-btn.visible { display: block; }
 
+    /* ── Footer ─────────────────────────────────────── */
     footer {
+      margin-top: 28px;
       font-size: 0.7rem;
-      color: #3a3a3a;
+      color: var(--muted2);
       text-align: center;
-      line-height: 1.9;
+      line-height: 2;
     }
     footer code {
-      background: #1a1a1a;
-      border: 1px solid #272727;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
       border-radius: 3px;
       padding: 1px 5px;
-      font-size: 0.68rem;
-      color: #555;
+      color: var(--muted);
+    }
+
+    /* ── Responsive ─────────────────────────────────── */
+    @media (max-width: 640px) {
+      .app { grid-template-columns: 1fr; }
+      .right { order: -1; }
+      #previewCanvas { aspect-ratio: 3 / 5; max-height: 300px; width: auto; margin: 0 auto; display: block; }
     }
   </style>
 </head>
@@ -274,65 +317,78 @@
 
 <header>
   <h1>CrossPoint Sleep Screen Converter</h1>
-  <p class="subtitle">480×800 · 4-level grayscale · Floyd-Steinberg · factory LUT quality</p>
+  <p class="subtitle">480×800 · 4-level grayscale · Floyd-Steinberg dithering</p>
 </header>
 
-<div class="drop-zone" id="dropZone">
-  <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12M12 16.5V3"/>
-  </svg>
-  Drop image here or click to browse
-  <input type="file" id="fileInput" accept="image/*">
-</div>
+<div class="app">
 
-<!-- Controls: mode pills + position picker (fit only) -->
-<div class="controls">
-  <div class="scale-row">
-    <label>Scale:</label>
-    <button class="pill" id="fitBtn" data-mode="fit">Fit</button>
-    <button class="pill active" id="cropBtn" data-mode="crop">Crop</button>
-  </div>
+  <!-- ── Left: drop zone + editor ─────────────────── -->
+  <div class="left">
 
-  <div class="position-row" id="positionRow">
-    <span class="pos-row-label">Position on screen</span>
-    <div class="pos-grid">
-      <button class="pos-btn" data-pos="tl" title="Top left"></button>
-      <button class="pos-btn" data-pos="tc" title="Top centre"></button>
-      <button class="pos-btn" data-pos="tr" title="Top right"></button>
-      <button class="pos-btn" data-pos="ml" title="Middle left"></button>
-      <button class="pos-btn active" data-pos="mc" title="Centre"></button>
-      <button class="pos-btn" data-pos="mr" title="Middle right"></button>
-      <button class="pos-btn" data-pos="bl" title="Bottom left"></button>
-      <button class="pos-btn" data-pos="bc" title="Bottom centre"></button>
-      <button class="pos-btn" data-pos="br" title="Bottom right"></button>
+    <div class="drop-zone" id="dropZone">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12M12 16.5V3"/>
+      </svg>
+      Drop image here or click to browse
+      <small>PNG, JPG, WebP, BMP, GIF</small>
+      <input type="file" id="fileInput" accept="image/*">
     </div>
-  </div>
-</div>
 
-<!-- Editor: source and preview always the same height -->
-<div class="editor-row" id="editorRow">
-  <div class="panel-col">
-    <span class="panel-label" id="sourceLabel">Source — drag to reposition</span>
-    <div class="source-frame" id="sourceFrame">
-      <canvas id="sourceCanvas"></canvas>
-      <div id="cropBox"></div>
-      <div id="snapGuideH" class="snap-guide"></div>
-      <div id="snapGuideV" class="snap-guide"></div>
+    <div class="editor-section" id="editorSection">
+      <p class="section-label" id="sourceLabel">Source — drag to reposition</p>
+      <div class="source-frame" id="sourceFrame">
+        <canvas id="sourceCanvas"></canvas>
+        <div id="cropBox"></div>
+        <div id="snapGuideH" class="snap-guide"></div>
+        <div id="snapGuideV" class="snap-guide"></div>
+      </div>
     </div>
+
   </div>
 
-  <div class="panel-col">
-    <span class="panel-label">Preview</span>
-    <!-- 480×800 internal, CSS halves to 240×400 — crisp 2× -->
-    <canvas id="previewCanvas" width="480" height="800"></canvas>
+  <!-- ── Right: settings + preview ───────────────── -->
+  <div class="right">
+
+    <div class="panel-section">
+      <p class="panel-heading">Scale</p>
+      <div class="pill-group">
+        <button class="pill" id="fitBtn" data-mode="fit">Fit</button>
+        <button class="pill active" id="cropBtn" data-mode="crop">Crop</button>
+      </div>
+    </div>
+
+    <div class="panel-section" id="posSection">
+      <p class="panel-heading">Position on screen</p>
+      <div class="pos-grid">
+        <button class="pos-btn" data-pos="tl" title="Top left"></button>
+        <button class="pos-btn" data-pos="tc" title="Top centre"></button>
+        <button class="pos-btn" data-pos="tr" title="Top right"></button>
+        <button class="pos-btn" data-pos="ml" title="Middle left"></button>
+        <button class="pos-btn active" data-pos="mc" title="Centre"></button>
+        <button class="pos-btn" data-pos="mr" title="Middle right"></button>
+        <button class="pos-btn" data-pos="bl" title="Bottom left"></button>
+        <button class="pos-btn" data-pos="bc" title="Bottom centre"></button>
+        <button class="pos-btn" data-pos="br" title="Bottom right"></button>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <p class="panel-heading">Preview</p>
+      <!-- internal 480×800, CSS maintains 3:5 ratio -->
+      <canvas id="previewCanvas" width="480" height="800"></canvas>
+    </div>
+
+    <div class="panel-section">
+      <button class="download-btn" id="downloadBtn">Download .pxc</button>
+    </div>
+
   </div>
+
 </div>
-
-<button class="download-btn" id="downloadBtn">Download .pxc</button>
 
 <footer>
-  Place file in <code>/.sleep/</code> or as <code>/sleep.pxc</code> on SD card<br>
-  480×800 px · 2 bits/pixel · ~96 KB per file
+  Place on SD card as <code>/sleep.pxc</code> or inside <code>/.sleep/</code><br>
+  480×800 px · 2 bits/pixel · ~96 KB
 </footer>
 
 <canvas id="workCanvas" width="480" height="800" style="display:none"></canvas>
@@ -340,8 +396,8 @@
 <script>
 const TARGET_W = 480;
 const TARGET_H = 800;
-const MAX_EDITOR_W = 300;
-const MAX_EDITOR_H = 500;
+const MAX_EDITOR_W = 340;
+const MAX_EDITOR_H = 520;
 const SNAP_THRESHOLD = 9;
 
 const GRAY_REF  = [0, 85, 170, 255];
@@ -355,28 +411,27 @@ let fitAlign     = 'mc';
 
 let displayScale = 1;
 let workScale    = 1;
-let dispImgW     = 0;
-let dispImgH     = 0;
+let dispImgW = 0, dispImgH = 0;
 let boxW = 0, boxH = 0, boxX = 0, boxY = 0;
 
-let isDragging   = false;
-let dragStartX   = 0, dragStartY = 0, dragStartBX = 0, dragStartBY = 0;
+let isDragging = false;
+let dragStartX = 0, dragStartY = 0, dragStartBX = 0, dragStartBY = 0;
 let snapH = false, snapV = false;
 let convertTimer = null;
 
-const dropZone     = document.getElementById('dropZone');
-const fileInput    = document.getElementById('fileInput');
-const editorRow    = document.getElementById('editorRow');
-const sourceFrame  = document.getElementById('sourceFrame');
-const sourceCanvas = document.getElementById('sourceCanvas');
-const sourceLabel  = document.getElementById('sourceLabel');
-const cropBox      = document.getElementById('cropBox');
-const snapGuideH   = document.getElementById('snapGuideH');
-const snapGuideV   = document.getElementById('snapGuideV');
-const positionRow  = document.getElementById('positionRow');
-const previewCanvas= document.getElementById('previewCanvas');
-const workCanvas   = document.getElementById('workCanvas');
-const downloadBtn  = document.getElementById('downloadBtn');
+const dropZone      = document.getElementById('dropZone');
+const fileInput     = document.getElementById('fileInput');
+const editorSection = document.getElementById('editorSection');
+const sourceFrame   = document.getElementById('sourceFrame');
+const sourceCanvas  = document.getElementById('sourceCanvas');
+const sourceLabel   = document.getElementById('sourceLabel');
+const cropBox       = document.getElementById('cropBox');
+const snapGuideH    = document.getElementById('snapGuideH');
+const snapGuideV    = document.getElementById('snapGuideV');
+const posSection    = document.getElementById('posSection');
+const previewCanvas = document.getElementById('previewCanvas');
+const workCanvas    = document.getElementById('workCanvas');
+const downloadBtn   = document.getElementById('downloadBtn');
 
 // Mode pills
 document.querySelectorAll('.pill').forEach(btn => {
@@ -398,7 +453,7 @@ document.querySelectorAll('.pos-btn').forEach(btn => {
   });
 });
 
-// Drop / file pick
+// Drop / browse
 dropZone.addEventListener('click', () => fileInput.click());
 dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('over'); });
 dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
@@ -446,17 +501,18 @@ function resetEditor() {
   if (mode === 'crop') {
     sourceLabel.textContent = 'Source — drag to reposition';
     cropBox.style.display = 'block';
-    positionRow.classList.remove('visible');
+    posSection.classList.remove('visible');
     clearSnap();
     applyCropBox();
   } else {
     sourceLabel.textContent = 'Source';
     cropBox.style.display = 'none';
-    positionRow.classList.add('visible');
+    posSection.classList.add('visible');
     clearSnap();
   }
 
-  editorRow.classList.add('visible');
+  dropZone.style.display = 'none';
+  editorSection.classList.add('visible');
   scheduleConvert(0);
 }
 
@@ -504,14 +560,11 @@ function onDragMove(e) {
   const p = clientXY(e);
   let rawX = dragStartBX + (p.x - dragStartX);
   let rawY = dragStartBY + (p.y - dragStartY);
-
-  const centreX = (dispImgW - boxW) / 2;
-  const centreY = (dispImgH - boxH) / 2;
-  snapH = Math.abs(rawX - centreX) < SNAP_THRESHOLD;
-  snapV = Math.abs(rawY - centreY) < SNAP_THRESHOLD;
-  boxX = snapH ? centreX : rawX;
-  boxY = snapV ? centreY : rawY;
-
+  const cx = (dispImgW - boxW) / 2, cy = (dispImgH - boxH) / 2;
+  snapH = Math.abs(rawX - cx) < SNAP_THRESHOLD;
+  snapV = Math.abs(rawY - cy) < SNAP_THRESHOLD;
+  boxX = snapH ? cx : rawX;
+  boxY = snapV ? cy : rawY;
   applyCropBox();
   snapGuideV.classList.toggle('active', snapH);
   snapGuideH.classList.toggle('active', snapV);
@@ -543,8 +596,8 @@ function quantize(v) {
 
 function fitOffset(fw, fh) {
   const pos = fitAlign;
-  let x = pos[1] === 'l' ? 0 : pos[1] === 'c' ? (TARGET_W - fw) / 2 : TARGET_W - fw;
-  let y = pos[0] === 't' ? 0 : pos[0] === 'm' ? (TARGET_H - fh) / 2 : TARGET_H - fh;
+  const x = pos[1] === 'l' ? 0 : pos[1] === 'c' ? (TARGET_W - fw) / 2 : TARGET_W - fw;
+  const y = pos[0] === 't' ? 0 : pos[0] === 'm' ? (TARGET_H - fh) / 2 : TARGET_H - fh;
   return { x, y };
 }
 
@@ -558,8 +611,8 @@ function convert() {
   ctx.fillRect(0, 0, TARGET_W, TARGET_H);
 
   if (mode === 'fit') {
-    const fitScale = Math.min(TARGET_W / srcW, TARGET_H / srcH);
-    const fw = srcW * fitScale, fh = srcH * fitScale;
+    const fs = Math.min(TARGET_W / srcW, TARGET_H / srcH);
+    const fw = srcW * fs, fh = srcH * fs;
     const off = fitOffset(fw, fh);
     ctx.drawImage(loadedImg, off.x, off.y, fw, fh);
   } else {
@@ -589,14 +642,14 @@ function convert() {
     }
   }
 
-  const prevCtx = previewCanvas.getContext('2d');
-  const id = prevCtx.createImageData(TARGET_W, TARGET_H);
+  const pc  = previewCanvas.getContext('2d');
+  const id  = pc.createImageData(TARGET_W, TARGET_H);
   for (let i = 0; i < TARGET_W * TARGET_H; i++) {
     const g = GRAY_DISP[q[i]];
     id.data[i*4] = id.data[i*4+1] = id.data[i*4+2] = g;
     id.data[i*4+3] = 255;
   }
-  prevCtx.putImageData(id, 0, 0);
+  pc.putImageData(id, 0, 0);
 
   pxcBytes = encodePxc(q, TARGET_W, TARGET_H);
   downloadBtn.classList.add('visible');
