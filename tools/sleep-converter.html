@@ -12,6 +12,7 @@
       --accent: #e8e8e8;
       --muted: #555;
       --text: #bbb;
+      --snap: rgba(255, 180, 0, 0.85);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -126,26 +127,29 @@
       border-radius: 6px;
       cursor: crosshair;
       flex-shrink: 0;
-      /* size set by JS */
     }
 
     #sourceCanvas {
       display: block;
-      /* size set by JS */
     }
 
-    /* Crop overlay: the 480×800 selection box */
+    /* Crop overlay */
     #cropBox {
       position: absolute;
       top: 0;
       left: 0;
-      /* box-shadow darkens everything outside the box */
       box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.52);
       border: 1.5px solid rgba(255,255,255,0.85);
       outline: 1px solid rgba(0,0,0,0.4);
       cursor: move;
       user-select: none;
       touch-action: none;
+      transition: border-color 0.1s, box-shadow 0.1s;
+    }
+
+    #cropBox.snapped {
+      border-color: rgba(255, 200, 60, 0.95);
+      box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(255, 200, 60, 0.3);
     }
 
     /* Corner handles */
@@ -158,14 +162,97 @@
       border-style: solid;
     }
 
-    #cropBox::before {
-      top: -1px; left: -1px;
-      border-width: 2px 0 0 2px;
+    #cropBox::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
+    #cropBox::after  { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+
+    /* ── Snap guides ─────────────────────────────── */
+    .snap-guide {
+      position: absolute;
+      pointer-events: none;
+      opacity: 0;
+      background: var(--snap);
+      transition: opacity 0.08s;
+      z-index: 10;
     }
 
-    #cropBox::after {
-      bottom: -1px; right: -1px;
-      border-width: 0 2px 2px 0;
+    .snap-guide.active { opacity: 1; }
+
+    #snapGuideH {
+      height: 1px;
+      left: 0; right: 0;
+      top: 50%;
+      margin-top: -0.5px;
+    }
+
+    #snapGuideV {
+      width: 1px;
+      top: 0; bottom: 0;
+      left: 50%;
+      margin-left: -0.5px;
+    }
+
+    /* ── Position picker (fit mode) ──────────────── */
+    .position-picker {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .position-picker.visible { display: flex; }
+
+    .pos-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 34px);
+      grid-template-rows: repeat(3, 34px);
+      gap: 4px;
+    }
+
+    .pos-btn {
+      width: 34px;
+      height: 34px;
+      border: 1px solid var(--border);
+      background: none;
+      border-radius: 5px;
+      cursor: pointer;
+      position: relative;
+      transition: border-color 0.1s, background 0.1s;
+    }
+
+    .pos-btn:hover { border-color: #555; background: #181818; }
+
+    /* The dot inside each button */
+    .pos-btn::after {
+      content: '';
+      position: absolute;
+      width: 7px;
+      height: 7px;
+      background: var(--muted);
+      border-radius: 1px;
+      transition: background 0.1s;
+    }
+
+    .pos-btn[data-pos="tl"]::after { top: 4px;  left: 4px; }
+    .pos-btn[data-pos="tc"]::after { top: 4px;  left: 50%; transform: translateX(-50%); }
+    .pos-btn[data-pos="tr"]::after { top: 4px;  right: 4px; }
+    .pos-btn[data-pos="ml"]::after { top: 50%;  left: 4px; transform: translateY(-50%); }
+    .pos-btn[data-pos="mc"]::after { top: 50%;  left: 50%; transform: translate(-50%, -50%); }
+    .pos-btn[data-pos="mr"]::after { top: 50%;  right: 4px; transform: translateY(-50%); }
+    .pos-btn[data-pos="bl"]::after { bottom: 4px; left: 4px; }
+    .pos-btn[data-pos="bc"]::after { bottom: 4px; left: 50%; transform: translateX(-50%); }
+    .pos-btn[data-pos="br"]::after { bottom: 4px; right: 4px; }
+
+    .pos-btn.active {
+      border-color: var(--accent);
+      background: rgba(232,232,232,0.08);
+    }
+    .pos-btn.active::after { background: var(--accent); }
+
+    .pos-label {
+      font-size: 0.67rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
     /* ── Preview ───────────────────────────────── */
@@ -250,16 +337,34 @@
 
 <div class="editor-row" id="editorRow">
   <div class="source-wrap">
-    <span class="panel-label">Source — drag to reposition</span>
+    <span class="panel-label" id="sourceLabel">Source — drag to reposition</span>
     <div class="source-frame" id="sourceFrame">
       <canvas id="sourceCanvas"></canvas>
       <div id="cropBox"></div>
+      <div id="snapGuideH" class="snap-guide"></div>
+      <div id="snapGuideV" class="snap-guide"></div>
+    </div>
+
+    <!-- Position picker — shown in fit mode only -->
+    <div class="position-picker" id="positionPicker">
+      <span class="pos-label">Position on screen</span>
+      <div class="pos-grid">
+        <button class="pos-btn" data-pos="tl" title="Top left"></button>
+        <button class="pos-btn" data-pos="tc" title="Top centre"></button>
+        <button class="pos-btn" data-pos="tr" title="Top right"></button>
+        <button class="pos-btn" data-pos="ml" title="Middle left"></button>
+        <button class="pos-btn active" data-pos="mc" title="Centre"></button>
+        <button class="pos-btn" data-pos="mr" title="Middle right"></button>
+        <button class="pos-btn" data-pos="bl" title="Bottom left"></button>
+        <button class="pos-btn" data-pos="bc" title="Bottom centre"></button>
+        <button class="pos-btn" data-pos="br" title="Bottom right"></button>
+      </div>
     </div>
   </div>
 
   <div class="preview-wrap">
     <span class="panel-label">Preview</span>
-    <!-- internal resolution is 480×800, CSS scales it to 240×400 -->
+    <!-- internal resolution 480×800, CSS scales to 240×400 — crisp 2× -->
     <canvas id="previewCanvas" width="480" height="800"></canvas>
   </div>
 </div>
@@ -279,28 +384,30 @@
 const TARGET_W = 480;
 const TARGET_H = 800;
 
-// Max display dimensions for the source image editor
 const MAX_EDITOR_W = 300;
 const MAX_EDITOR_H = 500;
 
-// Gray level targets for error diffusion — evenly spaced, factory LUT quality
-const GRAY_REF  = [0, 85, 170, 255];   // reference values for dither error
-const GRAY_DISP = [0, 85, 170, 255];   // display RGB values for preview
+// Snap threshold in editor pixels — within this distance of centre → snap
+const SNAP_THRESHOLD = 9;
+
+// Gray level references — evenly spaced, factory LUT quality
+const GRAY_REF  = [0, 85, 170, 255];
+const GRAY_DISP = [0, 85, 170, 255];
 
 // ─── State ──────────────────────────────────────────────────────────────────
 let loadedImg    = null;
-let currentFile  = null;
 let pxcBytes     = null;
 let outputName   = 'sleep.pxc';
 let mode         = 'crop';
+let fitAlign     = 'mc';   // fit mode: tl/tc/tr/ml/mc/mr/bl/bc/br
 
-let displayScale = 1;   // source → editor canvas scale
-let workScale    = 1;   // source → 480×800 work canvas scale
+let displayScale = 1;
+let workScale    = 1;
 let dispImgW     = 0;
 let dispImgH     = 0;
-let boxW         = 0;   // crop box size in editor pixels
+let boxW         = 0;
 let boxH         = 0;
-let boxX         = 0;   // crop box position in editor pixels
+let boxX         = 0;
 let boxY         = 0;
 
 let isDragging   = false;
@@ -308,18 +415,24 @@ let dragStartX   = 0;
 let dragStartY   = 0;
 let dragStartBX  = 0;
 let dragStartBY  = 0;
+let snapH        = false;   // currently snapped on horizontal axis
+let snapV        = false;   // currently snapped on vertical axis
 let convertTimer = null;
 
 // ─── DOM ────────────────────────────────────────────────────────────────────
-const dropZone     = document.getElementById('dropZone');
-const fileInput    = document.getElementById('fileInput');
-const editorRow    = document.getElementById('editorRow');
-const sourceFrame  = document.getElementById('sourceFrame');
-const sourceCanvas = document.getElementById('sourceCanvas');
-const cropBox      = document.getElementById('cropBox');
-const previewCanvas= document.getElementById('previewCanvas');
-const workCanvas   = document.getElementById('workCanvas');
-const downloadBtn  = document.getElementById('downloadBtn');
+const dropZone       = document.getElementById('dropZone');
+const fileInput      = document.getElementById('fileInput');
+const editorRow      = document.getElementById('editorRow');
+const sourceFrame    = document.getElementById('sourceFrame');
+const sourceCanvas   = document.getElementById('sourceCanvas');
+const sourceLabel    = document.getElementById('sourceLabel');
+const cropBox        = document.getElementById('cropBox');
+const snapGuideH     = document.getElementById('snapGuideH');
+const snapGuideV     = document.getElementById('snapGuideV');
+const positionPicker = document.getElementById('positionPicker');
+const previewCanvas  = document.getElementById('previewCanvas');
+const workCanvas     = document.getElementById('workCanvas');
+const downloadBtn    = document.getElementById('downloadBtn');
 
 // ─── Mode pills ─────────────────────────────────────────────────────────────
 document.querySelectorAll('.pill').forEach(btn => {
@@ -328,6 +441,16 @@ document.querySelectorAll('.pill').forEach(btn => {
     document.querySelectorAll('.pill').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     if (loadedImg) resetEditor();
+  });
+});
+
+// ─── Position picker ────────────────────────────────────────────────────────
+document.querySelectorAll('.pos-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    fitAlign = btn.dataset.pos;
+    document.querySelectorAll('.pos-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    scheduleConvert(0);
   });
 });
 
@@ -343,8 +466,7 @@ dropZone.addEventListener('drop', e => {
 fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
 
 function loadFile(file) {
-  currentFile = file;
-  outputName  = file.name.replace(/\.[^.]+$/, '') + '.pxc';
+  outputName = file.name.replace(/\.[^.]+$/, '') + '.pxc';
   const reader = new FileReader();
   reader.onload = e => {
     const img = new Image();
@@ -359,62 +481,66 @@ function resetEditor() {
   const srcW = loadedImg.naturalWidth;
   const srcH = loadedImg.naturalHeight;
 
-  // Scale image to fit in editor area
   displayScale = Math.min(MAX_EDITOR_W / srcW, MAX_EDITOR_H / srcH);
   dispImgW = Math.round(srcW * displayScale);
   dispImgH = Math.round(srcH * displayScale);
 
-  // Work scale: fill (crop) or fit
   if (mode === 'crop') {
     workScale = Math.max(TARGET_W / srcW, TARGET_H / srcH);
   } else {
     workScale = Math.min(TARGET_W / srcW, TARGET_H / srcH);
   }
 
-  // Crop box size in editor pixels (represents 480×800 in work space, mapped to display)
-  // In source pixels: TARGET_W/workScale × TARGET_H/workScale
-  // In editor pixels: × displayScale
-  boxW = (TARGET_W / workScale) * displayScale;
-  boxH = (TARGET_H / workScale) * displayScale;
+  boxW = Math.min((TARGET_W / workScale) * displayScale, dispImgW);
+  boxH = Math.min((TARGET_H / workScale) * displayScale, dispImgH);
 
-  // Clamp to editor image bounds (should never exceed in fill mode)
-  boxW = Math.min(boxW, dispImgW);
-  boxH = Math.min(boxH, dispImgH);
-
-  // Center the crop box
+  // Start centred
   boxX = (dispImgW - boxW) / 2;
   boxY = (dispImgH - boxH) / 2;
 
-  // Update source canvas
   sourceCanvas.width  = dispImgW;
   sourceCanvas.height = dispImgH;
   sourceCanvas.getContext('2d').drawImage(loadedImg, 0, 0, dispImgW, dispImgH);
 
-  // Size the frame to match the image
   sourceFrame.style.width  = dispImgW + 'px';
   sourceFrame.style.height = dispImgH + 'px';
 
-  // Apply crop box
-  applyCropBox();
+  // Mode-specific UI
+  if (mode === 'crop') {
+    sourceLabel.textContent = 'Source — drag to reposition';
+    cropBox.style.display = 'block';
+    positionPicker.classList.remove('visible');
+    clearSnap();
+    applyCropBox();
+  } else {
+    sourceLabel.textContent = 'Source';
+    cropBox.style.display = 'none';
+    positionPicker.classList.add('visible');
+    clearSnap();
+  }
 
-  // Show editor and convert
   editorRow.classList.add('visible');
   scheduleConvert(0);
 }
 
 function applyCropBox() {
-  // Clamp position to image bounds
   boxX = Math.max(0, Math.min(dispImgW - boxW, boxX));
   boxY = Math.max(0, Math.min(dispImgH - boxH, boxY));
-
   cropBox.style.left   = boxX + 'px';
   cropBox.style.top    = boxY + 'px';
   cropBox.style.width  = boxW + 'px';
   cropBox.style.height = boxH + 'px';
-  cropBox.style.cursor = mode === 'crop' ? 'move' : 'default';
 }
 
-// ─── Drag ────────────────────────────────────────────────────────────────────
+function clearSnap() {
+  snapH = false;
+  snapV = false;
+  snapGuideH.classList.remove('active');
+  snapGuideV.classList.remove('active');
+  cropBox.classList.remove('snapped');
+}
+
+// ─── Drag (crop mode) ────────────────────────────────────────────────────────
 cropBox.addEventListener('mousedown',  onDragStart);
 cropBox.addEventListener('touchstart', onDragStart, { passive: false });
 window.addEventListener('mousemove',   onDragMove);
@@ -431,29 +557,49 @@ function clientXY(e) {
 function onDragStart(e) {
   if (mode !== 'crop') return;
   e.preventDefault();
-  isDragging   = true;
-  const p      = clientXY(e);
-  dragStartX   = p.x;
-  dragStartY   = p.y;
-  dragStartBX  = boxX;
-  dragStartBY  = boxY;
+  isDragging  = true;
+  const p     = clientXY(e);
+  dragStartX  = p.x;
+  dragStartY  = p.y;
+  dragStartBX = boxX;
+  dragStartBY = boxY;
 }
 
 function onDragMove(e) {
   if (!isDragging) return;
   e.preventDefault();
+
   const p  = clientXY(e);
   const dx = p.x - dragStartX;
   const dy = p.y - dragStartY;
-  boxX = dragStartBX + dx;
-  boxY = dragStartBY + dy;
+
+  let rawX = dragStartBX + dx;
+  let rawY = dragStartBY + dy;
+
+  const centreX = (dispImgW - boxW) / 2;
+  const centreY = (dispImgH - boxH) / 2;
+
+  snapH = Math.abs(rawX - centreX) < SNAP_THRESHOLD;
+  snapV = Math.abs(rawY - centreY) < SNAP_THRESHOLD;
+
+  boxX = snapH ? centreX : rawX;
+  boxY = snapV ? centreY : rawY;
+
   applyCropBox();
-  scheduleConvert(120);
+
+  // Snap guides
+  snapGuideH.classList.toggle('active', snapV);
+  snapGuideV.classList.toggle('active', snapH);
+  cropBox.classList.toggle('snapped', snapH || snapV);
+
+  scheduleConvert(100);
 }
 
 function onDragEnd() {
   if (!isDragging) return;
   isDragging = false;
+  // Keep guides visible briefly then fade
+  setTimeout(clearSnap, 600);
   scheduleConvert(0);
 }
 
@@ -463,16 +609,26 @@ function scheduleConvert(delay) {
   convertTimer = setTimeout(convert, delay);
 }
 
-// Luminance — ITU-R BT.601, same as Bitmap.cpp
 function lum(r, g, b) { return (77 * r + 150 * g + 29 * b) >> 8; }
 
-// Quantise to 4 levels — midpoint thresholds for factory LUT quality
-// Thresholds: 43 / 128 / 213  (midpoints of 0, 85, 170, 255)
 function quantize(v) {
-  if (v < 43)  return 0;   // black
-  if (v < 128) return 1;   // dark gray
-  if (v < 213) return 2;   // light gray
-  return 3;                 // white
+  if (v < 43)  return 0;
+  if (v < 128) return 1;
+  if (v < 213) return 2;
+  return 3;
+}
+
+// Alignment offsets for fit mode position picker
+function fitOffset(fw, fh) {
+  const pos = fitAlign;
+  let x, y;
+  if      (pos[1] === 'l') x = 0;
+  else if (pos[1] === 'c') x = (TARGET_W - fw) / 2;
+  else                     x = TARGET_W - fw;
+  if      (pos[0] === 't') y = 0;
+  else if (pos[0] === 'm') y = (TARGET_H - fh) / 2;
+  else                     y = TARGET_H - fh;
+  return { x, y };
 }
 
 function convert() {
@@ -489,11 +645,10 @@ function convert() {
     const fitScale = Math.min(TARGET_W / srcW, TARGET_H / srcH);
     const fw = srcW * fitScale;
     const fh = srcH * fitScale;
-    ctx.drawImage(loadedImg, (TARGET_W - fw) / 2, (TARGET_H - fh) / 2, fw, fh);
+    const off = fitOffset(fw, fh);
+    ctx.drawImage(loadedImg, off.x, off.y, fw, fh);
   } else {
-    // Crop mode: draw image at workScale offset by crop box position
-    // k converts editor-pixel offset → work-canvas-pixel offset
-    const k  = workScale / displayScale;
+    const k = workScale / displayScale;
     ctx.drawImage(loadedImg, -boxX * k, -boxY * k, srcW * workScale, srcH * workScale);
   }
 
@@ -524,8 +679,7 @@ function convert() {
     }
   }
 
-  // ── Draw preview at full 480×800 resolution ────────────────────────────
-  // (Canvas is 480×800, CSS shrinks it to 240×400 for display — crisp.)
+  // ── Preview at full 480×800, CSS halves it ─────────────────────────────
   const prevCtx = previewCanvas.getContext('2d');
   const id      = prevCtx.createImageData(TARGET_W, TARGET_H);
   for (let i = 0; i < TARGET_W * TARGET_H; i++) {
@@ -542,8 +696,7 @@ function convert() {
   downloadBtn.classList.add('visible');
 }
 
-// ─── PXC encoder ────────────────────────────────────────────────────────────
-// Format: uint16_t width (LE), uint16_t height (LE), 2bpp pixels MSB-first
+// Format: uint16_t width (LE), uint16_t height (LE), 2bpp MSB-first row-major
 function encodePxc(q, w, h) {
   const bpr = Math.ceil(w / 4);
   const buf = new Uint8Array(4 + bpr * h);
