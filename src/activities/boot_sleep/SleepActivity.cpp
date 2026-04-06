@@ -8,6 +8,8 @@
 #include <Txt.h>
 #include <Xtc.h>
 
+#include "Epub/converters/DirectPixelWriter.h"
+
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "components/UITheme.h"
@@ -61,16 +63,20 @@ void SleepActivity::renderCustomSleepScreen() const {
         continue;
       }
 
-      if (!FsHelpers::hasBmpExtension(filename)) {
-        LOG_DBG("SLP", "Skipping non-.bmp file name: %s", name);
+      const bool isBmp = FsHelpers::hasBmpExtension(filename);
+      const bool isPxc = FsHelpers::hasPxcExtension(filename);
+      if (!isBmp && !isPxc) {
+        LOG_DBG("SLP", "Skipping non-BMP/PXC file: %s", name);
         file.close();
         continue;
       }
-      Bitmap bitmap(file);
-      if (bitmap.parseHeaders() != BmpReaderError::Ok) {
-        LOG_DBG("SLP", "Skipping invalid BMP file: %s", name);
-        file.close();
-        continue;
+      if (isBmp) {
+        Bitmap bitmap(file);
+        if (bitmap.parseHeaders() != BmpReaderError::Ok) {
+          LOG_DBG("SLP", "Skipping invalid BMP file: %s", name);
+          file.close();
+          continue;
+        }
       }
       files.emplace_back(filename);
       file.close();
@@ -86,10 +92,15 @@ void SleepActivity::renderCustomSleepScreen() const {
       APP_STATE.lastSleepImage = randomFileIndex;
       APP_STATE.saveToFile();
       const auto filename = std::string(sleepDir) + "/" + files[randomFileIndex];
+      LOG_DBG("SLP", "Randomly loading: %s/%s", sleepDir, files[randomFileIndex].c_str());
+      delay(100);
+      if (FsHelpers::hasPxcExtension(files[randomFileIndex])) {
+        renderPxcSleepScreen(filename);
+        dir.close();
+        return;
+      }
       FsFile file;
       if (Storage.openFileForRead("SLP", filename, file)) {
-        LOG_DBG("SLP", "Randomly loading: %s/%s", sleepDir, files[randomFileIndex].c_str());
-        delay(100);
         Bitmap bitmap(file, true);
         if (bitmap.parseHeaders() == BmpReaderError::Ok) {
           renderBitmapSleepScreen(bitmap);
@@ -103,8 +114,13 @@ void SleepActivity::renderCustomSleepScreen() const {
   }
   if (dir) dir.close();
 
-  // Look for sleep.bmp on the root of the sd card to determine if we should
-  // render a custom sleep screen instead of the default.
+  // Check root for sleep.pxc (preferred) or sleep.bmp
+  if (Storage.exists("/sleep.pxc")) {
+    LOG_DBG("SLP", "Loading: /sleep.pxc");
+    renderPxcSleepScreen("/sleep.pxc");
+    return;
+  }
+
   FsFile file;
   if (Storage.openFileForRead("SLP", "/sleep.bmp", file)) {
     Bitmap bitmap(file, true);
@@ -135,6 +151,66 @@ void SleepActivity::renderDefaultSleepScreen() const {
   }
 
   renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+}
+
+void SleepActivity::renderPxcSleepScreen(const std::string& path) const {
+  FsFile file;
+  if (!Storage.openFileForRead("SLP", path, file)) {
+    LOG_ERR("SLP", "Cannot open PXC: %s", path.c_str());
+    return renderDefaultSleepScreen();
+  }
+
+  uint16_t pxcWidth, pxcHeight;
+  if (file.read(&pxcWidth, 2) != 2 || file.read(&pxcHeight, 2) != 2) {
+    LOG_ERR("SLP", "PXC header read failed: %s", path.c_str());
+    file.close();
+    return renderDefaultSleepScreen();
+  }
+
+  const int screenWidth = renderer.getScreenWidth();
+  const int screenHeight = renderer.getScreenHeight();
+  if (abs(pxcWidth - screenWidth) > 1 || abs(pxcHeight - screenHeight) > 1) {
+    LOG_ERR("SLP", "PXC size %dx%d does not match screen %dx%d", pxcWidth, pxcHeight, screenWidth, screenHeight);
+    file.close();
+    return renderDefaultSleepScreen();
+  }
+
+  const uint32_t dataOffset = file.position();  // right after the 4-byte header
+
+  struct PxcCtx {
+    FsFile* file;
+    uint32_t dataOffset;
+    int width, height;
+  };
+  PxcCtx ctx{&file, dataOffset, pxcWidth, pxcHeight};
+
+  renderer.clearScreen();
+  renderer.renderGrayscale(
+      GfxRenderer::GrayscaleMode::FactoryQuality,
+      [](GfxRenderer& r, void* raw) {
+        const auto* c = static_cast<const PxcCtx*>(raw);
+        c->file->seek(c->dataOffset);
+
+        const int bytesPerRow = (c->width + 3) / 4;
+        uint8_t* rowBuf = static_cast<uint8_t*>(malloc(bytesPerRow));
+        if (!rowBuf) return;
+
+        DirectPixelWriter pw;
+        pw.init(r);
+
+        for (int row = 0; row < c->height; row++) {
+          if (c->file->read(rowBuf, bytesPerRow) != bytesPerRow) break;
+          pw.beginRow(row);
+          for (int col = 0; col < c->width; col++) {
+            const uint8_t pv = (rowBuf[col >> 2] >> (6 - (col & 3) * 2)) & 0x03;
+            pw.writePixel(col, pv);
+          }
+        }
+        free(rowBuf);
+      },
+      &ctx);
+
+  file.close();
 }
 
 void SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap) const {
