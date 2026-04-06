@@ -1,6 +1,5 @@
 #include "SleepActivity.h"
 
-#include <EInkDisplay.h>
 #include <Epub.h>
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
@@ -191,20 +190,19 @@ void SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap) const {
   }
 
   if (hasGreyscale) {
-    bitmap.rewindToData();
-    renderer.clearScreen(0x00);
-    renderer.setRenderMode(GfxRenderer::GRAY2_LSB);
-    renderer.drawBitmap(bitmap, x, y, pageWidth, pageHeight, cropX, cropY);
-    renderer.copyGrayscaleLsbBuffers();
-
-    bitmap.rewindToData();
-    renderer.clearScreen(0x00);
-    renderer.setRenderMode(GfxRenderer::GRAY2_MSB);
-    renderer.drawBitmap(bitmap, x, y, pageWidth, pageHeight, cropX, cropY);
-    renderer.copyGrayscaleMsbBuffers();
-
-    renderer.displayGrayBuffer(lut_factory_quality, true);
-    renderer.setRenderMode(GfxRenderer::BW);
+    struct BitmapGrayCtx {
+      const Bitmap* bitmap;
+      int x, y, maxWidth, maxHeight;
+      float cropX, cropY;
+    };
+    BitmapGrayCtx grayCtx{&bitmap, x, y, pageWidth, pageHeight, cropX, cropY};
+    renderer.renderGrayscale(GfxRenderer::GrayscaleMode::FactoryQuality,
+                             [](GfxRenderer& r, void* raw) {
+                               const auto* c = static_cast<const BitmapGrayCtx*>(raw);
+                               c->bitmap->rewindToData();
+                               r.drawBitmap(*c->bitmap, c->x, c->y, c->maxWidth, c->maxHeight, c->cropX, c->cropY);
+                             },
+                             &grayCtx);
   } else {
     renderer.displayBuffer(HalDisplay::HALF_REFRESH);
   }

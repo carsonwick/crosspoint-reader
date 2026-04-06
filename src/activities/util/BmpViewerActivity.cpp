@@ -1,7 +1,6 @@
 #include "BmpViewerActivity.h"
 
 #include <Bitmap.h>
-#include <EInkDisplay.h>
 #include <GfxRenderer.h>
 #include <HalStorage.h>
 #include <I18n.h>
@@ -58,22 +57,21 @@ void BmpViewerActivity::onEnter() {
       GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 
       if (bitmap.hasGreyscale()) {
-        bitmap.rewindToData();
-        renderer.clearScreen(0x00);
-        renderer.setRenderMode(GfxRenderer::GRAY2_LSB);
-        renderer.drawBitmap(bitmap, x, y, pageWidth, pageHeight, 0, 0);
-        GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
-        renderer.copyGrayscaleLsbBuffers();
-
-        bitmap.rewindToData();
-        renderer.clearScreen(0x00);
-        renderer.setRenderMode(GfxRenderer::GRAY2_MSB);
-        renderer.drawBitmap(bitmap, x, y, pageWidth, pageHeight, 0, 0);
-        GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
-        renderer.copyGrayscaleMsbBuffers();
-
-        renderer.displayGrayBuffer(lut_factory_quality, true);
-        renderer.setRenderMode(GfxRenderer::BW);
+        struct BmpGrayCtx {
+          Bitmap* bitmap;
+          int x, y, maxWidth, maxHeight;
+          MappedInputManager::Labels labels;
+        };
+        BmpGrayCtx grayCtx{&bitmap, x, y, pageWidth, pageHeight, labels};
+        renderer.renderGrayscale(GfxRenderer::GrayscaleMode::FactoryQuality,
+                                 [](GfxRenderer& r, void* raw) {
+                                   const auto* c = static_cast<const BmpGrayCtx*>(raw);
+                                   c->bitmap->rewindToData();
+                                   r.drawBitmap(*c->bitmap, c->x, c->y, c->maxWidth, c->maxHeight, 0, 0);
+                                   GUI.drawButtonHints(r, c->labels.btn1, c->labels.btn2, c->labels.btn3,
+                                                       c->labels.btn4);
+                                 },
+                                 &grayCtx);
       } else {
         renderer.displayBuffer(HalDisplay::FULL_REFRESH);
       }

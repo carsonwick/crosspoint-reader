@@ -1,5 +1,6 @@
 #include "GfxRenderer.h"
 
+#include <EInkDisplay.h>
 #include <FontDecompressor.h>
 #include <HalGPIO.h>
 #include <Logging.h>
@@ -1137,6 +1138,38 @@ void GfxRenderer::copyGrayscaleLsbBuffers() const { display.copyGrayscaleLsbBuff
 void GfxRenderer::copyGrayscaleMsbBuffers() const { display.copyGrayscaleMsbBuffers(frameBuffer); }
 
 void GfxRenderer::displayGrayBuffer(const unsigned char* lut, bool factoryMode) const { display.displayGrayBuffer(fadingFix, lut, factoryMode); }
+
+void GfxRenderer::renderGrayscale(GrayscaleMode mode, void (*renderFn)(GfxRenderer&, void*), void* ctx) {
+  if (mode == GrayscaleMode::FactoryFast) {
+    // Pre-flash to white so lut_factory_fast can drive particles reliably from any prior state.
+    // Without this, particles coming from an arbitrary BW state get stranded at intermediate
+    // grays: the fast frame clock (FR=0x44) doesn't provide enough dwell time per frame to
+    // complete the full black→white travel. From a known-white state only downward transitions
+    // are needed — a much shorter travel that converges within the fast frame budget.
+    clearScreen();
+    displayBuffer(HalDisplay::FAST_REFRESH);
+  }
+
+  const RenderMode lsbMode = (mode == GrayscaleMode::Differential) ? GRAYSCALE_LSB : GRAY2_LSB;
+  const RenderMode msbMode = (mode == GrayscaleMode::Differential) ? GRAYSCALE_MSB : GRAY2_MSB;
+  const bool factoryMode = (mode != GrayscaleMode::Differential);
+  const unsigned char* lut = (mode == GrayscaleMode::FactoryFast)     ? lut_factory_fast
+                              : (mode == GrayscaleMode::FactoryQuality) ? lut_factory_quality
+                                                                        : nullptr;
+
+  clearScreen(0x00);
+  setRenderMode(lsbMode);
+  renderFn(*this, ctx);
+  copyGrayscaleLsbBuffers();
+
+  clearScreen(0x00);
+  setRenderMode(msbMode);
+  renderFn(*this, ctx);
+  copyGrayscaleMsbBuffers();
+
+  displayGrayBuffer(lut, factoryMode);
+  setRenderMode(BW);
+}
 
 void GfxRenderer::freeBwBufferChunks() {
   for (auto& bwBufferChunk : bwBufferChunks) {
