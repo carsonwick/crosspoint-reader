@@ -72,6 +72,7 @@
     .left {
       display: flex;
       flex-direction: column;
+      align-items: center;
       gap: 12px;
     }
 
@@ -106,8 +107,8 @@
     #fileInput { display: none; }
 
     /* ── Source editor ────────────────────────────── */
-    .editor-section { display: none; }
-    .editor-section.visible { display: block; }
+    .editor-section { display: none; width: 100%; }
+    .editor-section.visible { display: flex; flex-direction: column; align-items: center; }
 
     .section-label {
       font-size: 0.68rem;
