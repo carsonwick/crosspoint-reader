@@ -7,7 +7,6 @@
 
 #include "XtcReaderActivity.h"
 
-#include <EInkDisplay.h>
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
 #include <HalStorage.h>
@@ -253,7 +252,7 @@ void XtcReaderActivity::renderPage() {
     const uint8_t* plane2 = pageBuffer + planeSize;  // Bit2 plane
     const size_t colBytes = (pageHeight + 7) / 8;    // Bytes per column (100 for 800 height)
 
-    // Lambda to get pixel value at (x, y)
+    // Lambda to get pixel value at (x, y) — used for BW render and debug stats
     auto getPixelValue = [&](uint16_t x, uint16_t y) -> uint8_t {
       const size_t colIndex = pageWidth - 1 - x;
       const size_t byteInCol = y / 8;
@@ -264,43 +263,45 @@ void XtcReaderActivity::renderPage() {
       return (bit1 << 1) | bit2;
     };
 
+    // Context + callback for renderGrayscale. Pixel selection adapts to the render mode set
+    // by renderGrayscale before each pass:
+    //   GRAY2_LSB  (factory BW RAM):   pv>=2 — LightGrey(2) and Black(3) → bit1=1
+    //   GRAY2_MSB  (factory RED RAM):  pv&1  — DarkGrey(1) and Black(3)  → bit0=1
+    //   GRAYSCALE_LSB (diff BW RAM):   pv==1 — DarkGrey only
+    //   GRAYSCALE_MSB (diff RED RAM):  pv==1||pv==2 — DarkGrey and LightGrey
+    struct XtcGrayCtx {
+      const uint8_t* plane1;
+      const uint8_t* plane2;
+      uint16_t pageWidth, pageHeight;
+      size_t colBytes;
+    };
+    XtcGrayCtx xtcCtx{plane1, plane2, pageWidth, pageHeight, colBytes};
+    const auto xtcGrayFn = [](GfxRenderer& r, void* raw) {
+      const auto* c = static_cast<const XtcGrayCtx*>(raw);
+      const auto mode = r.getRenderMode();
+      for (uint16_t y = 0; y < c->pageHeight; y++) {
+        for (uint16_t x = 0; x < c->pageWidth; x++) {
+          const size_t colIdx = c->pageWidth - 1 - x;
+          const size_t byteOff = colIdx * c->colBytes + y / 8;
+          const size_t bitPos = 7 - (y % 8);
+          const uint8_t pv = (((c->plane1[byteOff] >> bitPos) & 1) << 1) |
+                              ((c->plane2[byteOff] >> bitPos) & 1);
+          bool draw;
+          switch (mode) {
+            case GfxRenderer::GRAY2_LSB:     draw = (pv >= 2);          break;
+            case GfxRenderer::GRAY2_MSB:     draw = (pv == 1 || pv == 3); break;
+            case GfxRenderer::GRAYSCALE_LSB: draw = (pv == 1);          break;
+            default:                         draw = (pv == 1 || pv == 2); break;
+          }
+          if (draw) r.drawPixel(x, y, false);
+        }
+      }
+    };
+
     const bool useFactory = SETTINGS.factoryLutImages;
 
     if (useFactory) {
-      // Factory absolute 2-bit encoding: single display update, no BW flash.
-      // BW RAM (0x24) = bit1: 1 for light gray(2) and black(3), 0 for white(0) and dark gray(1).
-      // RED RAM (0x26) = bit0: 1 for dark gray(1) and black(3), 0 for white(0) and light gray(2).
-      // clearScreen(0x00) base; drawPixel(false) sets bits that need 1.
-
-      // Display LUT mapping: state0=White, state1=DarkGrey, state2=LightGrey, state3=Black.
-      // LUT state = (BW_bit << 1) | RED_bit = pv directly (pv=0=White...pv=3=Black).
-      // BW bit=0 where (pv >> 1) == 0 → pv=0 (White) and pv=1 (DarkGrey).
-      // RED bit=0 where (pv & 1) == 0 → pv=0 (White) and pv=2 (LightGrey).
-
-      // Plane1 → BW RAM (0x24): bit = (pv >> 1) & 1. bit=1 for LightGrey(2) and Black(3).
-      renderer.clearScreen(0x00);
-      for (uint16_t y = 0; y < pageHeight; y++) {
-        for (uint16_t x = 0; x < pageWidth; x++) {
-          if (getPixelValue(x, y) >= 2) {
-            renderer.drawPixel(x, y, false);
-          }
-        }
-      }
-      renderer.copyGrayscaleLsbBuffers();
-
-      // Plane2 → RED RAM (0x26): bit = pv & 1. bit=1 for DarkGrey(1) and Black(3).
-      renderer.clearScreen(0x00);
-      for (uint16_t y = 0; y < pageHeight; y++) {
-        for (uint16_t x = 0; x < pageWidth; x++) {
-          const uint8_t pv = getPixelValue(x, y);
-          if (pv == 1 || pv == 3) {
-            renderer.drawPixel(x, y, false);
-          }
-        }
-      }
-      renderer.copyGrayscaleMsbBuffers();
-
-      renderer.displayGrayBuffer(lut_factory_fast, true);
+      renderer.renderGrayscale(GfxRenderer::GrayscaleMode::FactoryFast, xtcGrayFn, &xtcCtx);
     } else {
       // Original differential mode: BW flash first, then gray overlay.
       // Optimized grayscale rendering without storeBwBuffer (saves 48KB peak memory).
@@ -333,31 +334,7 @@ void XtcReaderActivity::renderPage() {
         pagesUntilFullRefresh--;
       }
 
-      // Pass 2: LSB buffer - mark DARK gray only (value==1)
-      // In LUT: 0 = apply gray effect, 1 = untouched
-      renderer.clearScreen(0x00);
-      for (uint16_t y = 0; y < pageHeight; y++) {
-        for (uint16_t x = 0; x < pageWidth; x++) {
-          if (getPixelValue(x, y) == 1) {
-            renderer.drawPixel(x, y, false);
-          }
-        }
-      }
-      renderer.copyGrayscaleLsbBuffers();
-
-      // Pass 3: MSB buffer - mark LIGHT AND DARK gray (value==1 or 2)
-      renderer.clearScreen(0x00);
-      for (uint16_t y = 0; y < pageHeight; y++) {
-        for (uint16_t x = 0; x < pageWidth; x++) {
-          const uint8_t pv = getPixelValue(x, y);
-          if (pv == 1 || pv == 2) {
-            renderer.drawPixel(x, y, false);
-          }
-        }
-      }
-      renderer.copyGrayscaleMsbBuffers();
-
-      renderer.displayGrayBuffer(nullptr);
+      renderer.renderGrayscale(GfxRenderer::GrayscaleMode::Differential, xtcGrayFn, &xtcCtx);
     }
 
     // Re-render BW to framebuffer (restores display state for next frame / next BW page turn)

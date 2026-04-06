@@ -1,6 +1,5 @@
 #include "EpubReaderActivity.h"
 
-#include <EInkDisplay.h>
 #include <Epub/Page.h>
 #include <Epub/blocks/TextBlock.h>
 #include <FontCacheManager.h>
@@ -809,64 +808,33 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
 
   // grayscale rendering
   if (SETTINGS.textAntiAliasing) {
-    if (useFactoryGray) {
-      // Factory absolute encoding: single display update, no BW flash before gray
+    struct PageRenderCtx {
+      Page* page;
+      int fontId, left, top;
+    };
+    PageRenderCtx grayCtx{page.get(), SETTINGS.getReaderFontId(), orientedMarginLeft, orientedMarginTop};
+    const auto grayFn = [](GfxRenderer& r, void* raw) {
+      const auto* c = static_cast<const PageRenderCtx*>(raw);
+      c->page->render(r, c->fontId, c->left, c->top);
+    };
 
-      renderer.clearScreen(0x00);
-      renderer.setRenderMode(GfxRenderer::GRAY2_LSB);
-      page->render(renderer, SETTINGS.getReaderFontId(), orientedMarginLeft, orientedMarginTop);
-      renderer.copyGrayscaleLsbBuffers();
-      const auto tGrayLsb = millis();
+    const auto tGrayStart = millis();
+    const auto grayMode = useFactoryGray ? GfxRenderer::GrayscaleMode::FactoryFast
+                                         : GfxRenderer::GrayscaleMode::Differential;
+    renderer.renderGrayscale(grayMode, grayFn, &grayCtx);
+    const auto tGrayEnd = millis();
+    fcm->logStats(useFactoryGray ? "gray_factory" : "gray");
 
-      renderer.clearScreen(0x00);
-      renderer.setRenderMode(GfxRenderer::GRAY2_MSB);
-      page->render(renderer, SETTINGS.getReaderFontId(), orientedMarginLeft, orientedMarginTop);
-      renderer.copyGrayscaleMsbBuffers();
-      const auto tGrayMsb = millis();
+    renderer.restoreBwBuffer();
+    const auto tBwRestore = millis();
 
-      renderer.displayGrayBuffer(lut_factory_fast, true);
-      const auto tGrayDisplay = millis();
-      renderer.setRenderMode(GfxRenderer::BW);
-      fcm->logStats("gray_factory");
-
-      renderer.restoreBwBuffer();
-      const auto tBwRestore = millis();
-
-      const auto tEnd = millis();
-      LOG_DBG("ERS",
-              "Page render (factory): prewarm=%lums bw_render=%lums bw_store=%lums "
-              "gray_lsb=%lums gray_msb=%lums gray_display=%lums bw_restore=%lums total=%lums",
-              tPrewarm - t0, tBwRender - tPrewarm, tBwStore - tDisplay, tGrayLsb - tBwStore, tGrayMsb - tGrayLsb,
-              tGrayDisplay - tGrayMsb, tBwRestore - tGrayDisplay, tEnd - t0);
-    } else {
-      // Original differential mode: BW already displayed above
-      renderer.clearScreen(0x00);
-      renderer.setRenderMode(GfxRenderer::GRAYSCALE_LSB);
-      page->render(renderer, SETTINGS.getReaderFontId(), orientedMarginLeft, orientedMarginTop);
-      renderer.copyGrayscaleLsbBuffers();
-      const auto tGrayLsb = millis();
-
-      renderer.clearScreen(0x00);
-      renderer.setRenderMode(GfxRenderer::GRAYSCALE_MSB);
-      page->render(renderer, SETTINGS.getReaderFontId(), orientedMarginLeft, orientedMarginTop);
-      renderer.copyGrayscaleMsbBuffers();
-      const auto tGrayMsb = millis();
-
-      renderer.displayGrayBuffer(nullptr);
-      const auto tGrayDisplay = millis();
-      renderer.setRenderMode(GfxRenderer::BW);
-      fcm->logStats("gray");
-
-      renderer.restoreBwBuffer();
-      const auto tBwRestore = millis();
-
-      const auto tEnd = millis();
-      LOG_DBG("ERS",
-              "Page render: prewarm=%lums bw_render=%lums display=%lums bw_store=%lums "
-              "gray_lsb=%lums gray_msb=%lums gray_display=%lums bw_restore=%lums total=%lums",
-              tPrewarm - t0, tBwRender - tPrewarm, tDisplay - tBwRender, tBwStore - tDisplay, tGrayLsb - tBwStore,
-              tGrayMsb - tGrayLsb, tGrayDisplay - tGrayMsb, tBwRestore - tGrayDisplay, tEnd - t0);
-    }
+    const auto tEnd = millis();
+    LOG_DBG("ERS",
+            "Page render (%s): prewarm=%lums bw_render=%lums display=%lums bw_store=%lums "
+            "gray=%lums bw_restore=%lums total=%lums",
+            useFactoryGray ? "factory" : "diff",
+            tPrewarm - t0, tBwRender - tPrewarm, tDisplay - tBwRender, tBwStore - tDisplay,
+            tGrayEnd - tGrayStart, tBwRestore - tGrayEnd, tEnd - t0);
   } else {
     // restore the bw data
     renderer.restoreBwBuffer();

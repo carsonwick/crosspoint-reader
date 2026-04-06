@@ -34,6 +34,13 @@ class GfxRenderer {
     LandscapeCounterClockwise  // 800x480 logical coordinates, native panel orientation
   };
 
+  // Selects LUT, pixel-plane encoding, and pre-flash behavior for renderGrayscale().
+  enum class GrayscaleMode {
+    FactoryFast,     // Factory absolute 2-bit (lut_factory_fast); pre-flashes to white before passes
+    FactoryQuality,  // Factory absolute 2-bit (lut_factory_quality); no pre-flash
+    Differential,    // Differential 2-bit overlay (no LUT); no pre-flash, requires prior BW state
+  };
+
  private:
   static constexpr size_t BW_BUFFER_CHUNK_SIZE = 8000;  // 8KB chunks to allow for non-contiguous memory
 
@@ -157,6 +164,12 @@ class GfxRenderer {
   bool storeBwBuffer();    // Returns true if buffer was stored successfully
   void restoreBwBuffer();  // Restore and free the stored buffer
   void cleanupGrayscaleWithFrameBuffer() const;
+  // Two-pass grayscale render. renderFn is called twice: once with the LSB render mode set
+  // (writes BW RAM plane), then with the MSB mode set (writes RED RAM plane). The method
+  // handles pre-flash (FactoryFast only), clearScreen, setRenderMode, buffer copies,
+  // displayGrayBuffer, and resets renderMode to BW on completion.
+  // storeBwBuffer / restoreBwBuffer remain the caller's responsibility.
+  void renderGrayscale(GrayscaleMode mode, void (*renderFn)(GfxRenderer&, void*), void* ctx);
 
   // Font helpers
   const uint8_t* getGlyphBitmap(const EpdFontData* fontData, const EpdGlyph* glyph) const;
