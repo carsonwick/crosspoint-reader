@@ -213,7 +213,12 @@ void XtcReaderActivity::renderPage() {
     const bool useFactory = SETTINGS.factoryLutImages;
 
     if (useFactory) {
-      // Factory absolute 2-bit encoding: single display update, no BW flash.
+      // Factory absolute 2-bit encoding. Pre-flash to white so lut_factory_fast transitions
+      // reliably from a known state — without this, pixels from a prior BW page get stuck at
+      // intermediate grays on first render.
+      renderer.clearScreen();
+      renderer.displayBuffer(HalDisplay::FAST_REFRESH);
+
       // BW RAM (0x24) = bit1: 1 for light gray(2) and black(3), 0 for white(0) and dark gray(1).
       // RED RAM (0x26) = bit0: 1 for dark gray(1) and black(3), 0 for white(0) and light gray(2).
       // clearScreen(0x00) base; drawPixel(false) sets bits that need 1.

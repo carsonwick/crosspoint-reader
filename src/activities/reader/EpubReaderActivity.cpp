@@ -747,7 +747,11 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   // grayscale rendering
   if (SETTINGS.textAntiAliasing) {
     if (useFactoryGray) {
-      // Factory absolute encoding: single display update, no BW flash before gray
+      // Factory absolute encoding. Pre-flash to white so lut_factory_fast can transition
+      // reliably from a known state — without this, pixels coming from a BW page state
+      // get stuck at intermediate grays on first render.
+      renderer.clearScreen();
+      renderer.displayBuffer(HalDisplay::FAST_REFRESH);
 
       renderer.clearScreen(0x00);
       renderer.setRenderMode(GfxRenderer::GRAY2_LSB);
